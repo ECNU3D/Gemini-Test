@@ -1,9 +1,9 @@
 import os
 from dotenv import load_dotenv
-# Note: Ensure you have installed llama-index-llms-openai
-# pip install llama-index-llms-openai
-from llama_index.llms.openai import OpenAI
-from llama_index.core.llms import CompletionResponse
+# Note: Ensure you have installed llama-index-llms-openai-like
+# pip install llama-index-llms-openai-like
+from llama_index.llms.openai_like import OpenAILike
+from llama_index.core.llms import ChatMessage, ChatResponse
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,39 +16,40 @@ model_name = os.getenv("MODEL_NAME", "default-model") # Provide a default model 
 if not api_base_url:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
-print(f"--- Configuring LlamaIndex OpenAI LLM ---")
+print(f"--- Configuring LlamaIndex OpenAILike LLM ---")
 print(f"Base URL: {api_base_url}")
 print(f"Model: {model_name}")
 print("API Key: Using provided key (or dummy key)")
 print("---")
 
 try:
-    # Instantiate the OpenAI LLM from LlamaIndex
-    # Note: LlamaIndex uses 'api_base' instead of 'openai_api_base'
-    llm = OpenAI(
+    # Instantiate the OpenAILike LLM from LlamaIndex
+    llm = OpenAILike(
         model=model_name,
         api_key=api_key,
         api_base=api_base_url,
+        is_chat_model=True,
         temperature=0.7,
         max_tokens=150
     )
 
     # Define the prompt
     prompt = "What are the main benefits of using a framework like LlamaIndex or LangChain?"
+    messages = [ChatMessage(role="user", content=prompt)]
 
-    print("--- Sending request using LlamaIndex ---")
-    print(f"Prompt: {prompt}")
+    print("--- Sending request using LlamaIndex (OpenAILike) ---")
+    print(f"Messages: {messages}")
     print("---")
 
-    # Use the complete method for a simple text completion
-    # For chat models/endpoints, use .chat() instead:
-    # from llama_index.core.llms import ChatMessage
-    # response = llm.chat([ChatMessage(role="user", content=prompt)])
-    response: CompletionResponse = llm.complete(prompt)
+    # Use the chat method for chat models/endpoints
+    response: ChatResponse = llm.chat(messages)
 
     print("--- LlamaIndex Response --- ")
     print(f"Type: {type(response)}")
-    print(f"Text: {response.text}")
+    if response.message:
+        print(f"Content: {response.message.content}")
+    else:
+        print("No message content received.")
     if response.raw:
         print(f"Raw Response: {response.raw}")
     print("---")

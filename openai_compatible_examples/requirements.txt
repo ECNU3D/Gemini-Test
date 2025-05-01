@@ -1,9 +1,12 @@
 openai
 requests
+aiohttp
 python-dotenv
+tenacity
 langchain
 llama-index
 
 # Potentially add more specific framework packages later, e.g.:
 langchain-openai
-llama-index-llms-openai 
+llama-index-llms-openai
+llama-index-llms-openai-like 

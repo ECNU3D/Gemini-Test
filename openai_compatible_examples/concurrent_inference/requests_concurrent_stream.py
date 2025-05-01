@@ -1,0 +1,106 @@
+import os
+import asyncio
+import aiohttp
+import json
+import time
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get API details from environment variables
+api_base = os.getenv("OPENAI_API_BASE")
+api_key = os.getenv("OPENAI_API_KEY", "dummy-key")
+model_name = os.getenv("MODEL_NAME", "default-model")
+
+if not api_base:
+    raise ValueError("OPENAI_API_BASE environment variable not set.")
+
+chat_completions_url = f"{api_base.rstrip('/')}/chat/completions"
+
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {api_key}",
+    "Accept": "text/event-stream" # Important for streaming
+}
+
+payloads = [
+    {
+        "model": model_name,
+        "messages": [{"role": "user", "content": f"Write a short poem #{i+1}"}],
+        "max_tokens": 60,
+        "temperature": 0.6 + i*0.1,
+        "stream": True # Enable streaming
+    } for i in range(3) # Create 3 concurrent requests
+]
+
+async def process_stream(response, request_id):
+    print(f"[Stream {request_id}] Receiving data...")
+    full_content = ""
+    try:
+        async for line in response.content:
+            line_str = line.decode('utf-8').strip()
+            if line_str.startswith("data:"):
+                data_content = line_str[len("data:"):].strip()
+                if data_content == "[DONE]":
+                    print(f"\n[Stream {request_id}] Stream finished.")
+                    break
+                try:
+                    chunk = json.loads(data_content)
+                    if chunk.get("choices") and len(chunk["choices"]) > 0:
+                        delta = chunk["choices"][0].get("delta", {})
+                        content_piece = delta.get("content", "")
+                        if content_piece:
+                            print(content_piece, end="", flush=True) # Print delta immediately
+                            full_content += content_piece
+                except json.JSONDecodeError:
+                    print(f"\n[Stream {request_id}] Warning: Received non-JSON data: {data_content}")
+            elif line_str: # Handle potential empty lines or other data
+                print(f"\n[Stream {request_id}] Received non-SSE line: {line_str}")
+
+    except Exception as e:
+        print(f"\n[Stream {request_id}] Error processing stream: {e}")
+    finally:
+        print(f"[Stream {request_id}] Final content length: {len(full_content)}")
+        return full_content
+
+async def make_streaming_request(session, url, headers, payload, request_id):
+    print(f"[Stream {request_id}] Sending request...")
+    try:
+        async with session.post(url, headers=headers, json=payload) as response:
+            print(f"[Stream {request_id}] Status: {response.status}")
+            if response.status == 200:
+                result = await process_stream(response, request_id)
+                return result
+            else:
+                error_text = await response.text()
+                print(f"[Stream {request_id}] Error: {response.status} - {error_text}")
+                return None
+    except aiohttp.ClientError as e:
+        print(f"[Stream {request_id}] Connection Error: {e}")
+        return None
+
+async def main():
+    print(f"--- Sending {len(payloads)} concurrent streaming requests using aiohttp ---")
+    print(f"Target URL: {chat_completions_url}")
+    print(f"Model: {model_name}")
+    print("---")
+
+    start_time = time.time()
+    async with aiohttp.ClientSession() as session:
+        tasks = [
+            make_streaming_request(session, chat_completions_url, headers, payload, i+1)
+            for i, payload in enumerate(payloads)
+        ]
+        results = await asyncio.gather(*tasks) # Run tasks concurrently
+
+    end_time = time.time()
+    print(f"\n--- All concurrent streams finished ---")
+    print(f"Total time: {end_time - start_time:.2f} seconds")
+    # Results contains the full text from each stream (or None if error)
+    # print(f"Aggregated results: {results}")
+
+if __name__ == "__main__":
+    if os.name == 'nt':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    asyncio.run(main()) 
