@@ -11,6 +11,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 from utils.image_helpers import encode_image_to_base64
+from utils.auth_helpers import get_api_key
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,8 +25,8 @@ image_path = os.getenv("IMAGE_PATH")
 
 if not api_base:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
-if not image_path:
-    raise ValueError("IMAGE_PATH environment variable not set. Please provide a path to an image file.")
+if not image_path or not os.path.exists(image_path):
+    raise ValueError(f"Image path '{image_path}' not found or not set in .env (IMAGE_PATH).")
 
 print(f"--- Preparing multimodal request --- ")
 print(f"API Base: {api_base}")
@@ -51,7 +52,6 @@ chat_completions_url = f"{api_base.rstrip('/')}/chat/completions"
 # Define headers
 headers = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}"
 }
 
 # Define the payload using the OpenAI vision format
@@ -84,35 +84,42 @@ payload_log["messages"][0]["content"][1]["image_url"]["url"] = f"{base64_image_u
 print(f"Payload (image truncated): {json.dumps(payload_log, indent=2)}")
 print("---")
 
-try:
-    # Make the POST request
-    response = requests.post(chat_completions_url, headers=headers, json=data)
+def main():
+    try:
+        # Fetch the latest API key
+        current_api_key = get_api_key()
+        headers = {**headers, "Authorization": f"Bearer {current_api_key}"}
 
-    # Check for successful response
-    response.raise_for_status() # Raises an HTTPError for bad responses
+        # Send the POST request
+        response = requests.post(chat_completions_url, headers=headers, json=data, timeout=120)
 
-    # Parse the JSON response
-    response_json = response.json()
+        response.raise_for_status()
 
-    print("--- Full API Response ---")
-    print(json.dumps(response_json, indent=2))
-    print("---")
+        # Parse the JSON response
+        response_json = response.json()
 
-    # Extract and print the message content
-    if "choices" in response_json and len(response_json["choices"]) > 0:
-        first_choice = response_json["choices"][0]
-        if "message" in first_choice and "content" in first_choice["message"]:
-            message_content = first_choice["message"]["content"]
-            print(f"Assistant's Response: {message_content}")
+        print("--- Full API Response ---")
+        print(json.dumps(response_json, indent=2))
+        print("---")
+
+        # Extract and print the message content
+        if "choices" in response_json and len(response_json["choices"]) > 0:
+            first_choice = response_json["choices"][0]
+            if "message" in first_choice and "content" in first_choice["message"]:
+                message_content = first_choice["message"]["content"]
+                print(f"Assistant's Response: {message_content}")
+            else:
+                print("Could not find message content in the response.")
         else:
-            print("Could not find message content in the response.")
-    else:
-        print("No choices found in the response.")
+            print("No choices found in the response.")
 
-except requests.exceptions.RequestException as e:
-    print(f"An error occurred during the request: {e}")
-    if hasattr(e, 'response') and e.response is not None:
-        print(f"Response status code: {e.response.status_code}")
-        print(f"Response text: {e.response.text}")
-except Exception as e:
-    print(f"An unexpected error occurred: {e}") 
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred during the request: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Response status code: {e.response.status_code}")
+            print(f"Response text: {e.response.text}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+if __name__ == "__main__":
+    main() 

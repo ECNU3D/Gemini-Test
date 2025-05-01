@@ -2,7 +2,9 @@ import os
 import asyncio
 import time
 from openai import AsyncOpenAI, APIError
+from openai.types.chat import ChatCompletionChunk # For type hinting
 from dotenv import load_dotenv
+from utils.auth_helpers import get_api_key_async # Use async version
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,11 +17,11 @@ model_name = os.getenv("MODEL_NAME", "default-model")
 if not api_base_url:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
-# Configure the Async OpenAI client
-aclient = AsyncOpenAI(
-    base_url=api_base_url,
-    api_key=api_key,
-)
+# Initialize client - API key fetched per request/stream
+# aclient = AsyncOpenAI(
+#     base_url=api_base_url,
+#     api_key=api_key
+# )
 
 # Define multiple message sets for concurrent requests
 all_messages = [
@@ -52,9 +54,16 @@ async def process_openai_stream(stream, request_id):
         print(f"[Stream {request_id}] Final content length: {len(full_content)}")
         return full_content
 
-async def make_openai_streaming_request(messages, request_id):
-    print(f"[Stream {request_id}] Sending request...")
+async def run_openai_stream(messages, request_id):
+    print(f"[Stream {request_id}] Starting...")
+    full_content = ""
     try:
+        # Initialize client within the task to fetch the latest key
+        aclient = AsyncOpenAI(
+            base_url=api_base_url,
+            api_key=await get_api_key_async()
+        )
+
         stream = await aclient.chat.completions.create(
             model=model_name,
             messages=messages,
@@ -80,7 +89,7 @@ async def main():
     start_time = time.time()
 
     tasks = [
-        make_openai_streaming_request(messages, i+1)
+        run_openai_stream(messages, i+1)
         for i, messages in enumerate(all_messages)
     ]
     results = await asyncio.gather(*tasks) # Run tasks concurrently

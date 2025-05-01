@@ -2,6 +2,7 @@ import os
 import requests
 import json
 from dotenv import load_dotenv
+from utils.auth_helpers import get_api_key
 
 # Load environment variables from .env file
 load_dotenv()
@@ -47,43 +48,57 @@ print(f"--- Sending request for JSON response to: {chat_completions_url} ---")
 print(f"Payload: {json.dumps(data, indent=2)}")
 print("---")
 
-try:
-    # Make the POST request
-    response = requests.post(chat_completions_url, headers=headers, json=data)
-
-    # Check for successful response
-    response.raise_for_status() # Raises an HTTPError for bad responses (4xx or 5xx)
-
-    # Parse the JSON response from the API call itself
-    response_api_json = response.json()
-
-    print("--- Full API Response ---")
-    print(json.dumps(response_api_json, indent=2))
+def main():
+    print("--- Sending JSON mode request using requests library ---")
+    print(f"Target URL: {chat_completions_url}")
+    print(f"Model: {model_name}")
+    print("NOTE: Ensure your prompt instructs the model to output JSON.")
     print("---")
 
-    # Extract the message content, which should be a JSON string
-    if "choices" in response_api_json and len(response_api_json["choices"]) > 0:
-        first_choice = response_api_json["choices"][0]
-        if "message" in first_choice and "content" in first_choice["message"]:
-            message_content_str = first_choice["message"]["content"]
-            print(f"Assistant's raw content (should be JSON string):\n{message_content_str}")
-            print("---")
-            # Attempt to parse the message content string as JSON
-            try:
-                parsed_content_json = json.loads(message_content_str)
-                print("Parsed JSON content from Assistant:")
-                print(json.dumps(parsed_content_json, indent=2))
-            except json.JSONDecodeError:
-                print("Could not parse the assistant's message content as JSON.")
-        else:
-            print("Could not find message content in the response.")
-    else:
-        print("No choices found in the response.")
+    try:
+        # Fetch the latest API key
+        current_api_key = get_api_key()
+        headers = {**headers, "Authorization": f"Bearer {current_api_key}"}
 
-except requests.exceptions.RequestException as e:
-    print(f"An error occurred during the request: {e}")
-    if hasattr(e, 'response') and e.response is not None:
-        print(f"Response status code: {e.response.status_code}")
-        print(f"Response text: {e.response.text}")
-except Exception as e:
-    print(f"An unexpected error occurred: {e}") 
+        # Send the POST request
+        response = requests.post(chat_completions_url, headers=headers, json=data, timeout=60)
+
+        # Raise an exception for bad status codes (4xx or 5xx)
+        response.raise_for_status()
+
+        # Parse the JSON response from the API call itself
+        response_api_json = response.json()
+
+        print("--- Full API Response ---")
+        print(json.dumps(response_api_json, indent=2))
+        print("---")
+
+        # Extract the message content, which should be a JSON string
+        if "choices" in response_api_json and len(response_api_json["choices"]) > 0:
+            first_choice = response_api_json["choices"][0]
+            if "message" in first_choice and "content" in first_choice["message"]:
+                message_content_str = first_choice["message"]["content"]
+                print(f"Assistant's raw content (should be JSON string):\n{message_content_str}")
+                print("---")
+                # Attempt to parse the message content string as JSON
+                try:
+                    parsed_content_json = json.loads(message_content_str)
+                    print("Parsed JSON content from Assistant:")
+                    print(json.dumps(parsed_content_json, indent=2))
+                except json.JSONDecodeError:
+                    print("Could not parse the assistant's message content as JSON.")
+            else:
+                print("Could not find message content in the response.")
+        else:
+            print("No choices found in the response.")
+
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred during the request: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Response status code: {e.response.status_code}")
+            print(f"Response text: {e.response.text}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+if __name__ == "__main__":
+    main() 

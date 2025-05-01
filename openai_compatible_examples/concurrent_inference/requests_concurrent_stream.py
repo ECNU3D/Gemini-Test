@@ -4,6 +4,7 @@ import aiohttp
 import json
 import time
 from dotenv import load_dotenv
+from utils.auth_helpers import get_api_key_async
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,7 +21,6 @@ chat_completions_url = f"{api_base.rstrip('/')}/chat/completions"
 
 headers = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}",
     "Accept": "text/event-stream" # Important for streaming
 }
 
@@ -65,17 +65,18 @@ async def process_stream(response, request_id):
         return full_content
 
 async def make_streaming_request(session, url, headers, payload, request_id):
-    print(f"[Stream {request_id}] Sending request...")
+    print(f"[Stream {request_id}] Starting...")
+
     try:
-        async with session.post(url, headers=headers, json=payload) as response:
-            print(f"[Stream {request_id}] Status: {response.status}")
-            if response.status == 200:
-                result = await process_stream(response, request_id)
-                return result
-            else:
-                error_text = await response.text()
-                print(f"[Stream {request_id}] Error: {response.status} - {error_text}")
-                return None
+        # Fetch the latest API key asynchronously
+        current_api_key = await get_api_key_async()
+        headers = {**headers, "Authorization": f"Bearer {current_api_key}"}
+
+        async with session.post(url, headers=headers, json=payload, timeout=60) as response:
+            response.raise_for_status()
+            print(f"[Stream {request_id}] Connection successful (Status: {response.status})")
+            result = await process_stream(response, request_id)
+            return result
     except aiohttp.ClientError as e:
         print(f"[Stream {request_id}] Connection Error: {e}")
         return None

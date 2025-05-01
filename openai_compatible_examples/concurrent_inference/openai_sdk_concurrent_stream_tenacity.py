@@ -7,6 +7,7 @@ from openai.types.chat import ChatCompletionChunk # For type hinting
 from openai import AsyncStream # For type hinting
 from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception, RetryError
+from utils.auth_helpers import get_api_key_async # Use async version
 
 # --- Tenacity Retry Settings ---
 MAX_ATTEMPTS = 5

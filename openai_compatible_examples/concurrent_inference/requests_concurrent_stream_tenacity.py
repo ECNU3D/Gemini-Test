@@ -6,6 +6,7 @@ import time
 import random
 from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception, RetryError
+from utils.auth_helpers import get_api_key_async
 
 # --- Tenacity Retry Settings ---
 MAX_ATTEMPTS = 5
@@ -23,7 +24,7 @@ if not api_base:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
 chat_completions_url = f"{api_base.rstrip('/')}/chat/completions"
-headers = {
+base_headers = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {api_key}",
     "Accept": "text/event-stream"
@@ -61,8 +62,12 @@ def should_retry_aiohttp(exception):
     retry=retry_if_exception(should_retry_aiohttp),
     reraise=True
 )
-async def initiate_stream_request(session, url, headers, payload, request_id):
+async def initiate_stream_request(session, url, payload, request_id):
     """Attempts to initiate the stream request, retrying on specific errors."""
+    # Fetch the latest API key *before* the first attempt by tenacity
+    current_api_key = await get_api_key_async()
+    headers = {**base_headers, "Authorization": f"Bearer {current_api_key}"}
+
     print(f"[Stream {request_id}] Attempting connection (attempt {initiate_stream_request.retry.statistics['attempt_number']})...")
     response = await session.post(url, headers=headers, json=payload, timeout=30)
     # Raise errors for tenacity to catch (429, 5xx, connection errors)
@@ -103,12 +108,12 @@ async def process_stream(response, request_id):
         await response.release() # Ensure connection is released after processing
         return full_content
 
-async def run_request_and_process(session, url, headers, payload, request_id):
+async def run_request_and_process(session, url, payload, request_id):
     """Wrapper to initiate request with retry and then process the stream."""
     response = None
     try:
         # Initiate stream, retrying with tenacity if necessary
-        response = await initiate_stream_request(session, url, headers, payload, request_id)
+        response = await initiate_stream_request(session, url, payload, request_id)
         # If initiation succeeded, process the stream
         result = await process_stream(response, request_id)
         return result
@@ -141,7 +146,7 @@ async def main():
 
     async with aiohttp.ClientSession() as session:
         tasks = [
-            run_with_semaphore(run_request_and_process(session, chat_completions_url, headers, payload, i+1))
+            run_with_semaphore(run_request_and_process(session, chat_completions_url, payload, i+1))
             for i, payload in enumerate(payloads)
         ]
         results = await asyncio.gather(*tasks)

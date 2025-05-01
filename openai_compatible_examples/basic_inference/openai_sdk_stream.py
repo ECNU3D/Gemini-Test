@@ -1,6 +1,15 @@
 import os
+import sys
 from openai import OpenAI, APIError
 from dotenv import load_dotenv
+
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+from utils.auth_helpers import get_api_key
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,55 +28,66 @@ print(f"Model: {model_name}")
 print("API Key: Using provided key (or dummy key)")
 print("---")
 
-# Configure the OpenAI client to point to your endpoint
-client = OpenAI(
-    base_url=api_base_url,
-    api_key=api_key,
-)
+def main():
+    print("--- Sending streaming request using OpenAI SDK ---")
+    print(f"Base URL: {api_base_url}")
+    print(f"Model: {model_name}")
+    print("---")
 
-# Define the messages payload
-messages = [
-    {"role": "user", "content": "Write a short poem about the moon."}
-]
+    try:
+        # Initialize client - API key is fetched dynamically *per request* below
+        client = OpenAI(
+            base_url=api_base_url,
+            api_key="temp-key" # Initial key, will be replaced
+        )
 
-print("--- Sending streaming request using OpenAI SDK ---")
-print(f"Messages: {messages}")
-print("---")
-print("Assistant's Response (streaming):")
+        # Fetch the latest API key and update the client
+        client.api_key = get_api_key()
 
-full_response_content = ""
-try:
-    # Make the API call with stream=True
-    stream = client.chat.completions.create(
-        model=model_name,
-        messages=messages,
-        max_tokens=100,
-        temperature=0.7,
-        stream=True, # Enable streaming
-    )
+        # Define the messages payload
+        messages = [
+            {"role": "user", "content": "Write a short poem about the moon."}
+        ]
 
-    # Iterate over the stream chunks
-    for chunk in stream:
-        # Check if the chunk has content in the delta
-        if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-            content_part = chunk.choices[0].delta.content
-            print(content_part, end='', flush=True) # Print part as it arrives
-            full_response_content += content_part
-        # You might also want to check for finish_reason if needed
-        # if chunk.choices and chunk.choices[0].finish_reason:
-        #    print(f"\nStream finished with reason: {chunk.choices[0].finish_reason}")
+        print(f"Messages: {messages}")
+        print("---")
+        print("Assistant's Response (streaming):")
 
-    print("\n\n--- Stream finished ---")
-    # Optional: print the full assembled response
-    # print("\n--- Full Assembled Response ---")
-    # print(full_response_content)
-    # print("---")
+        full_response_content = ""
+        # Make the API call with stream=True
+        stream = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            max_tokens=100,
+            temperature=0.7,
+            stream=True, # Enable streaming
+        )
 
-except APIError as e:
-    # Handle API errors
-    print(f"\nAn API error occurred: {e}")
-    print(f"Status Code: {e.status_code}")
-    print(f"Response: {e.response}")
-except Exception as e:
-    # Handle other potential errors
-    print(f"\nAn unexpected error occurred: {e}") 
+        # Iterate over the stream chunks
+        for chunk in stream:
+            # Check if the chunk has content in the delta
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                content_part = chunk.choices[0].delta.content
+                print(content_part, end='', flush=True) # Print part as it arrives
+                full_response_content += content_part
+            # You might also want to check for finish_reason if needed
+            # if chunk.choices and chunk.choices[0].finish_reason:
+            #    print(f"\nStream finished with reason: {chunk.choices[0].finish_reason}")
+
+        print("\n\n--- Stream finished ---")
+        # Optional: print the full assembled response
+        # print("\n--- Full Assembled Response ---")
+        # print(full_response_content)
+        # print("---")
+
+    except APIError as e:
+        # Handle API errors
+        print(f"\nAn API error occurred: {e}")
+        print(f"Status Code: {e.status_code}")
+        print(f"Response: {e.response}")
+    except Exception as e:
+        # Handle other potential errors
+        print(f"\nAn unexpected error occurred: {e}")
+
+if __name__ == "__main__":
+    main() 

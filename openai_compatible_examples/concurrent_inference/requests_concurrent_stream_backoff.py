@@ -5,6 +5,7 @@ import json
 import time
 import random
 from dotenv import load_dotenv
+from utils.auth_helpers import get_api_key_async
 
 # --- Retry Settings ---
 MAX_RETRIES = 5
@@ -22,9 +23,8 @@ if not api_base:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
 chat_completions_url = f"{api_base.rstrip('/')}/chat/completions"
-headers = {
+base_headers = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}",
     "Accept": "text/event-stream"
 }
 payloads = [

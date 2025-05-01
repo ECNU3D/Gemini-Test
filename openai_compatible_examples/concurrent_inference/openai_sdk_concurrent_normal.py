@@ -1,8 +1,10 @@
 import os
 import asyncio
 import time
-from openai import AsyncOpenAI, APIError # Import AsyncOpenAI
+import random
+from openai import AsyncOpenAI, APIError, RateLimitError
 from dotenv import load_dotenv
+from utils.auth_helpers import get_api_key_async # Use async version
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,11 +17,12 @@ model_name = os.getenv("MODEL_NAME", "default-model")
 if not api_base_url:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
-# Configure the Async OpenAI client
-aclient = AsyncOpenAI(
-    base_url=api_base_url,
-    api_key=api_key,
-)
+# Configure the Async OpenAI client (create instance per request for key refresh)
+# Note: We could update client.api_key, but re-creating is simple for this example
+# aclient = AsyncOpenAI(
+#     base_url=api_base_url,
+#     api_key=api_key # Initial key, will be replaced
+# )
 
 # Define multiple message sets for concurrent requests
 all_messages = [
@@ -34,9 +37,16 @@ all_messages = [
     ]
 ]
 
-async def make_openai_request(messages, request_id):
-    print(f"[Request {request_id}] Sending...")
+async def send_openai_request(messages, request_id):
+    task_start_time = time.time()
+    print(f"[Request {request_id}] Starting...")
     try:
+        # Initialize client within the task to fetch the latest key
+        aclient = AsyncOpenAI(
+            base_url=api_base_url,
+            api_key=await get_api_key_async()
+        )
+
         response = await aclient.chat.completions.create(
             model=model_name,
             messages=messages,
@@ -63,7 +73,7 @@ async def main():
     start_time = time.time()
 
     tasks = [
-        make_openai_request(messages, i+1)
+        send_openai_request(messages, i+1)
         for i, messages in enumerate(all_messages)
     ]
     results = await asyncio.gather(*tasks) # Run tasks concurrently

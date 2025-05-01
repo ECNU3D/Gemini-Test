@@ -5,6 +5,7 @@ import json
 import time
 import random
 from dotenv import load_dotenv
+from utils.auth_helpers import get_api_key_async
 
 # --- Retry Settings ---
 MAX_RETRIES = 5
@@ -24,9 +25,8 @@ if not api_base:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
 chat_completions_url = f"{api_base.rstrip('/')}/chat/completions"
-headers = {
+base_headers = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}"
 }
 payloads = [
     {
@@ -37,26 +37,39 @@ payloads = [
     } for i in range(5) # Increase number of requests to potentially trigger rate limits
 ]
 
-async def make_request_with_backoff(session, url, headers, payload, request_id):
-    retries = 0
-    backoff_time = INITIAL_BACKOFF_S
-    while retries < MAX_RETRIES:
-        print(f"[Request {request_id}, Attempt {retries+1}/{MAX_RETRIES}] Sending...")
+async def send_request_with_retry(session, url, payload, request_id):
+    task_start_time = time.time()
+    print(f"[Request {request_id}] Starting (with retry)...Attempt 1")
+    # Fetch initial key outside the loop
+    current_api_key = await get_api_key_async()
+
+    for attempt in range(MAX_RETRIES):
+        wait_time = min(INITIAL_BACKOFF_S * (2 ** attempt), MAX_BACKOFF_S)
+        # Add jitter: random small amount +/- up to 1 second
+        jitter = random.uniform(-1, 1)
+        actual_wait = max(0, wait_time + jitter)
+
         try:
+            # Refresh key ONLY if it's not the first attempt
+            # Assuming key *might* have expired during wait
+            if attempt > 0:
+                print(f"[Request {request_id}] Refreshing API key before attempt {attempt + 1}...")
+                current_api_key = await get_api_key_async()
+
+            headers = {**base_headers, "Authorization": f"Bearer {current_api_key}"}
+
             async with session.post(url, headers=headers, json=payload, timeout=60) as response:
                 if response.status == 429:
-                    print(f"[Request {request_id}, Attempt {retries+1}] Received 429 Rate Limit. Retrying in {backoff_time:.2f}s...")
+                    print(f"[Request {request_id}, Attempt {attempt+1}] Received 429 Rate Limit. Retrying in {actual_wait:.2f}s...")
                     # Check for retry-after header if available (optional, depends on API)
                     retry_after = response.headers.get("Retry-After")
-                    wait = backoff_time
+                    wait = actual_wait
                     if retry_after:
                         try:
-                            wait = max(backoff_time, float(retry_after)) # Use header if it's longer
+                            wait = max(actual_wait, float(retry_after)) # Use header if it's longer
                         except ValueError:
                             pass # Ignore invalid header value
                     await asyncio.sleep(wait)
-                    retries += 1
-                    backoff_time = min(MAX_BACKOFF_S, backoff_time * 2) + random.uniform(0, 1) # Exponential backoff with jitter
                     continue # Go to next retry iteration
 
                 # If not 429, check for other client/server errors
@@ -64,22 +77,20 @@ async def make_request_with_backoff(session, url, headers, payload, request_id):
 
                 # Success
                 response_json = await response.json()
-                print(f"[Request {request_id}, Attempt {retries+1}] Status: {response.status} - Success")
+                print(f"[Request {request_id}, Attempt {attempt+1}] Status: {response.status} - Success")
                 # print(f"[Request {request_id}] Received Response: {json.dumps(response_json, indent=2)}") # Optional: print full response
                 print(f"[Request {request_id}] Text: {response_json.get('choices', [{}])[0].get('message', {}).get('content', 'N/A').strip()}")
                 return response_json
 
         except aiohttp.ClientError as e:
-            print(f"[Request {request_id}, Attempt {retries+1}] Network/Client Error: {e}. Retrying in {backoff_time:.2f}s...")
+            print(f"[Request {request_id}, Attempt {attempt+1}] Network/Client Error: {e}. Retrying in {actual_wait:.2f}s...")
         except asyncio.TimeoutError:
-             print(f"[Request {request_id}, Attempt {retries+1}] Request timed out. Retrying in {backoff_time:.2f}s...")
+             print(f"[Request {request_id}, Attempt {attempt+1}] Request timed out. Retrying in {actual_wait:.2f}s...")
         except Exception as e:
             # Catch other unexpected errors during request/response handling
-            print(f"[Request {request_id}, Attempt {retries+1}] Unexpected error: {e}. Retrying in {backoff_time:.2f}s...")
+            print(f"[Request {request_id}, Attempt {attempt+1}] Unexpected error: {e}. Retrying in {actual_wait:.2f}s...")
 
-        await asyncio.sleep(backoff_time)
-        retries += 1
-        backoff_time = min(MAX_BACKOFF_S, backoff_time * 2) + random.uniform(0, 1)
+        await asyncio.sleep(actual_wait)
 
     print(f"[Request {request_id}] Failed after {MAX_RETRIES} retries.")
     return None # Indicate failure
@@ -95,7 +106,7 @@ async def main():
     start_time = time.time()
     async with aiohttp.ClientSession() as session:
         tasks = [
-            make_request_with_backoff(session, chat_completions_url, headers, payload, i+1)
+            send_request_with_retry(session, chat_completions_url, payload, i+1)
             for i, payload in enumerate(payloads)
         ]
         results = await asyncio.gather(*tasks) # Run tasks concurrently

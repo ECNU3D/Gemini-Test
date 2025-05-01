@@ -3,8 +3,10 @@ import asyncio
 import time
 import random
 from openai import AsyncOpenAI, APIError, RateLimitError, APITimeoutError
+from openai.types.chat import ChatCompletion # For type hinting
 from dotenv import load_dotenv
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception, RetryError
+from utils.auth_helpers import get_api_key_async # Use async version
 
 # --- Tenacity Retry Settings ---
 MAX_ATTEMPTS = 5
@@ -21,11 +23,11 @@ model_name = os.getenv("MODEL_NAME", "default-model")
 if not api_base_url:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
-# Configure the Async OpenAI client
-# Disable SDK's built-in retries to rely solely on tenacity
+# Configure the Async OpenAI client (disable built-in retries)
+# API key will be set before each attempt via tenacity wrapper
 aclient = AsyncOpenAI(
     base_url=api_base_url,
-    api_key=api_key,
+    api_key="dummy-key", # Placeholder, will be overwritten
     max_retries=0
 )
 
@@ -59,10 +61,13 @@ def should_retry_openai(exception):
     retry=retry_if_exception(should_retry_openai),
     reraise=True # Reraise the exception if all retries fail
 )
-async def make_openai_request_with_tenacity(messages, request_id):
-    print(f"[Request {request_id}] Sending (attempt {make_openai_request_with_tenacity.retry.statistics['attempt_number']})...")
-    # No try/except needed here for tenacity-handled retries
-    response = await aclient.chat.completions.create(
+async def send_openai_request_with_tenacity(messages, request_id):
+    """Attempts the OpenAI request, retrying on specific errors via tenacity."""
+    # Refresh API key before each attempt (handled by tenacity wrapper below)
+    # aclient.api_key = await get_api_key_async() # This is conceptually what happens
+    print(f"[Request {request_id}] Sending (attempt {send_openai_request_with_tenacity.retry.statistics['attempt_number']})...")
+
+    response: ChatCompletion = await aclient.chat.completions.create(
         model=model_name,
         messages=messages,
         max_tokens=100,
@@ -74,6 +79,17 @@ async def make_openai_request_with_tenacity(messages, request_id):
     print(f"[Request {request_id}] Text: {response.choices[0].message.content.strip()}")
     return response
 
+async def run_openai_request_wrapper(messages, request_id):
+    """Wrapper to handle API key refresh before calling the tenacity-decorated function."""
+    try:
+        # Refresh key before the first tenacity attempt
+        aclient.api_key = await get_api_key_async()
+        result = await send_openai_request_with_tenacity(messages, request_id)
+        return result
+    except RetryError as e:
+        # This catches the final exception if tenacity gives up
+        print(f"[Request {request_id}] FAILED permanently after all retries: {type(e).__name__}: {e}")
+        return None # Indicate failure
 
 async def main():
     print(f"--- Sending {len(all_messages)} concurrent normal requests using OpenAI SDK with tenacity backoff ---")
@@ -88,13 +104,14 @@ async def main():
     async def run_with_semaphore(messages, req_id):
         async with semaphore:
             try:
-                return await make_openai_request_with_tenacity(messages, req_id)
+                return await run_openai_request_wrapper(messages, req_id)
             except Exception as e:
                 # Catch the exception if tenacity finally gives up
                 print(f"[Request {req_id}] FAILED permanently after all retries: {type(e).__name__}: {e}")
                 return None # Indicate failure
 
     tasks = [
+        # Pass messages and request_id to the wrapper
         run_with_semaphore(messages, i+1)
         for i, messages in enumerate(all_messages)
     ]

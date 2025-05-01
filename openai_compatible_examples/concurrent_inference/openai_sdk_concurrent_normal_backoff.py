@@ -2,8 +2,9 @@ import os
 import asyncio
 import time
 import random
-from openai import AsyncOpenAI, APIError, RateLimitError # Import RateLimitError
+from openai import AsyncOpenAI, APIError, RateLimitError, APITimeoutError
 from dotenv import load_dotenv
+from utils.auth_helpers import get_api_key_async # Use async version
 
 # --- Retry Settings ---
 MAX_RETRIES = 5
@@ -34,12 +35,27 @@ all_messages = [
     ] for i in range(5) # Increase requests
 ]
 
-async def make_openai_request_with_backoff(messages, request_id):
-    retries = 0
-    backoff_time = INITIAL_BACKOFF_S
-    while retries < MAX_RETRIES:
-        print(f"[Request {request_id}, Attempt {retries+1}/{MAX_RETRIES}] Sending...")
+async def send_openai_request_with_retry(messages, request_id):
+    task_start_time = time.time()
+    print(f"[Request {request_id}] Starting (with retry)... Attempt 1")
+
+    # Initialize client once - we will update the key if a retry happens
+    aclient = AsyncOpenAI(
+        base_url=api_base_url,
+        api_key=await get_api_key_async() # Fetch initial key
+    )
+
+    for attempt in range(MAX_RETRIES):
+        wait_time = min(INITIAL_BACKOFF_S * (2 ** attempt), MAX_BACKOFF_S)
+        jitter = random.uniform(-1, 1)
+        actual_wait = max(0, wait_time + jitter)
+
         try:
+            # Refresh key ONLY if it's not the first attempt
+            if attempt > 0:
+                print(f"[Request {request_id}] Refreshing API key before attempt {attempt + 1}...")
+                aclient.api_key = await get_api_key_async()
+
             response = await aclient.chat.completions.create(
                 model=model_name,
                 messages=messages,
@@ -48,27 +64,25 @@ async def make_openai_request_with_backoff(messages, request_id):
                 stream=False,
                 timeout=60.0
             )
-            print(f"[Request {request_id}, Attempt {retries+1}] Success")
+            print(f"[Request {request_id}, Attempt {attempt+1}] Success")
             print(f"[Request {request_id}] Text: {response.choices[0].message.content.strip()}")
             return response
         except RateLimitError as e:
-            print(f"[Request {request_id}, Attempt {retries+1}] Received RateLimitError (429). Retrying in {backoff_time:.2f}s...")
+            print(f"[Request {request_id}, Attempt {attempt+1}] Received RateLimitError (429). Retrying in {actual_wait:.2f}s...")
             # OpenAI SDK's RateLimitError might contain retry guidance, but it's not guaranteed
             # for all compatible APIs. We stick to exponential backoff here.
             # wait_time = e.response.headers.get("retry-after") # Example if header was accessible
         except APIError as e:
             # Handle other API errors (e.g., 5xx server errors)
-            print(f"[Request {request_id}, Attempt {retries+1}] OpenAI API Error (Status: {e.status_code}): {e}. Retrying in {backoff_time:.2f}s...")
+            print(f"[Request {request_id}, Attempt {attempt+1}] OpenAI API Error (Status: {e.status_code}): {e}. Retrying in {actual_wait:.2f}s...")
         except asyncio.TimeoutError:
-             print(f"[Request {request_id}, Attempt {retries+1}] Request timed out. Retrying in {backoff_time:.2f}s...")
+             print(f"[Request {request_id}, Attempt {attempt+1}] Request timed out. Retrying in {actual_wait:.2f}s...")
         except Exception as e:
             # Catch other unexpected errors
-            print(f"[Request {request_id}, Attempt {retries+1}] Unexpected error: {e}. Retrying in {backoff_time:.2f}s...")
+            print(f"[Request {request_id}, Attempt {attempt+1}] Unexpected error: {e}. Retrying in {actual_wait:.2f}s...")
 
         # Wait and increase backoff time
-        await asyncio.sleep(backoff_time)
-        retries += 1
-        backoff_time = min(MAX_BACKOFF_S, backoff_time * 2) + random.uniform(0, 1)
+        await asyncio.sleep(actual_wait)
 
     print(f"[Request {request_id}] Failed after {MAX_RETRIES} retries.")
     return None
@@ -88,7 +102,7 @@ async def main():
             return await coro
 
     tasks = [
-        run_with_semaphore(make_openai_request_with_backoff(messages, i+1))
+        run_with_semaphore(send_openai_request_with_retry(messages, i+1))
         for i, messages in enumerate(all_messages)
     ]
     results = await asyncio.gather(*tasks)

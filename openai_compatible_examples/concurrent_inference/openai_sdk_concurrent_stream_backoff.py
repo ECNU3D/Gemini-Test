@@ -2,8 +2,11 @@ import os
 import asyncio
 import time
 import random
-from openai import AsyncOpenAI, APIError, RateLimitError
+from openai import AsyncOpenAI, APIError, RateLimitError, APITimeoutError
+from openai.types.chat import ChatCompletionChunk # For type hinting
+from openai import AsyncStream # For type hinting
 from dotenv import load_dotenv
+from utils.auth_helpers import get_api_key_async # Use async version
 
 # --- Retry Settings ---
 MAX_RETRIES = 5
@@ -20,11 +23,11 @@ model_name = os.getenv("MODEL_NAME", "default-model")
 if not api_base_url:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
-# Configure the Async OpenAI client (disable built-in retries)
+# Initialize client - Key will be updated before retries
 aclient = AsyncOpenAI(
     base_url=api_base_url,
-    api_key=api_key,
-    max_retries=0
+    api_key="dummy-key", # Placeholder
+    max_retries=0       # Disable built-in retries
 )
 
 all_messages = [

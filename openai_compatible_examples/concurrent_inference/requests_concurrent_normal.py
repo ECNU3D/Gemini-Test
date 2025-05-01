@@ -4,6 +4,7 @@ import aiohttp
 import json
 import time
 from dotenv import load_dotenv
+from utils.auth_helpers import get_api_key_async # Use async version
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,9 +21,8 @@ if not api_base:
 chat_completions_url = f"{api_base.rstrip('/')}/chat/completions"
 
 # Define headers
-headers = {
+base_headers = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}"
 }
 
 # Define multiple payloads for concurrent requests
@@ -35,13 +35,23 @@ payloads = [
     } for i in range(3) # Create 3 concurrent requests
 ]
 
-async def make_request(session, url, headers, payload, request_id):
-    print(f"[Request {request_id}] Sending...")
-    async with session.post(url, headers=headers, json=payload) as response:
-        print(f"[Request {request_id}] Status: {response.status}")
-        response_json = await response.json()
-        print(f"[Request {request_id}] Received Response: {json.dumps(response_json, indent=2)}")
-        return response_json
+async def send_request(session, url, payload, request_id):
+    task_start_time = time.time()
+    print(f"[Request {request_id}] Starting...")
+    try:
+        # Fetch the latest API key asynchronously
+        current_api_key = await get_api_key_async()
+        headers = {**base_headers, "Authorization": f"Bearer {current_api_key}"}
+
+        async with session.post(url, headers=headers, json=payload, timeout=60) as response:
+            response_data = await response.json()
+            response.raise_for_status() # Raise an exception for bad status codes
+            print(f"[Request {request_id}] Status: {response.status}")
+            print(f"[Request {request_id}] Received Response: {json.dumps(response_data, indent=2)}")
+            return response_data
+    except Exception as e:
+        print(f"[Request {request_id}] Error: {e}")
+        return None
 
 async def main():
     # Updated print statement
@@ -53,7 +63,7 @@ async def main():
     start_time = time.time()
     async with aiohttp.ClientSession() as session:
         tasks = [
-            make_request(session, chat_completions_url, headers, payload, i+1)
+            send_request(session, chat_completions_url, payload, i+1)
             for i, payload in enumerate(payloads)
         ]
         results = await asyncio.gather(*tasks) # Run tasks concurrently

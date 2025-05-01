@@ -4,7 +4,7 @@ This project demonstrates various ways to interact with a custom LLM endpoint th
 
 ## Features
 
-*   Basic inference examples (`basic_inference/`) (single request, streaming, JSON mode) using both `requests` library and the official `openai` Python SDK.
+*   Basic inference examples (`basic_inference/`) (normal request, streaming, JSON mode) using both `requests` library and the official `openai` Python SDK.
 *   Concurrent inference examples (`concurrent_inference/`) using `aiohttp` and the async `openai` SDK:
     *   Normal and streaming requests.
     *   Examples demonstrating manual exponential backoff for handling 429 rate limits.
@@ -13,6 +13,15 @@ This project demonstrates various ways to interact with a custom LLM endpoint th
 *   Multimodal examples (`multimodal/`) demonstrating how to:
     *   Send image data (text + image) to the chat completions endpoint.
     *   Send audio data for transcription (speech-to-text).
+*   Advanced usage examples (`advanced_usage/`) covering:
+    *   Function Calling / Tool Use (Chat Completions).
+    *   Logit Bias (Chat Completions).
+    *   Embedding Generation (`/embeddings` endpoint).
+    *   Batch API interaction (`/batches` endpoint).
+    *   Advanced Stream Handling (Tool Call Aggregation).
+    *   Multiple Image Input (Vision Models).
+    *   Using Fine-Tuned Models (Chat Completions).
+    *   Structured Output (via Forced Tool/Function Calling).
 
 ## Setup
 
@@ -60,8 +69,8 @@ Navigate to the root directory (`openai_compatible_examples`) and run the Python
 ```bash
 # --- Basic Inference (Single Request Focus) --- #
 
-# Single request (requests lib)
-python basic_inference/requests_single.py
+# Normal request (requests lib)
+python basic_inference/requests_normal.py
 
 # Streaming request (requests lib)
 python basic_inference/requests_stream.py
@@ -69,8 +78,8 @@ python basic_inference/requests_stream.py
 # JSON mode request (requests lib)
 python basic_inference/requests_json.py
 
-# Single request (OpenAI SDK)
-python basic_inference/openai_sdk_single.py
+# Normal request (OpenAI SDK)
+python basic_inference/openai_sdk_normal.py
 
 # Streaming request (OpenAI SDK)
 python basic_inference/openai_sdk_stream.py
@@ -144,3 +153,54 @@ python multimodal/requests_transcription.py
 # Audio transcription request (OpenAI SDK)
 # (Ensure AUDIO_PATH is set in .env)
 python multimodal/openai_sdk_transcription.py
+
+
+# --- Advanced Usage --- #
+
+# Function calling (requests lib)
+python advanced_usage/requests_function_calling.py
+
+# Tool use / function calling (OpenAI SDK)
+python advanced_usage/openai_sdk_tool_use.py
+
+# Logit bias (requests lib) - Requires correct token IDs for the model!
+python advanced_usage/requests_logit_bias.py
+
+# Logit bias (OpenAI SDK) - Requires correct token IDs for the model!
+python advanced_usage/openai_sdk_logit_bias.py
+
+# Embedding generation (requests lib) - Requires /embeddings endpoint
+# (Ensure EMBEDDING_MODEL_NAME is set in .env if needed)
+python advanced_usage/requests_embeddings.py
+
+# Embedding generation (OpenAI SDK) - Requires /embeddings endpoint
+# (Ensure EMBEDDING_MODEL_NAME is set in .env if needed)
+python advanced_usage/openai_sdk_embeddings.py
+
+# Batch API interaction (OpenAI SDK) - Requires /batches endpoint and input file
+# Creates ./example_batch_input.jsonl if not found.
+python advanced_usage/batch_api_example.py
+
+# Advanced stream handling - tool call aggregation (requests lib)
+python advanced_usage/requests_advanced_stream.py
+
+# Advanced stream handling - tool call aggregation (OpenAI SDK)
+python advanced_usage/openai_sdk_advanced_stream.py
+
+# Multiple image input (requests lib) - Requires vision model & images
+python advanced_usage/requests_multi_image.py
+
+# Multiple image input (OpenAI SDK) - Requires vision model & images
+python advanced_usage/openai_sdk_multi_image.py
+
+# Using a fine-tuned model ID (requests lib) - Requires FINE_TUNED_MODEL_NAME in .env
+python advanced_usage/requests_finetuned_model.py
+
+# Using a fine-tuned model ID (OpenAI SDK) - Requires FINE_TUNED_MODEL_NAME in .env
+python advanced_usage/openai_sdk_finetuned_model.py
+
+# Structured output via forced function call (requests lib)
+python advanced_usage/requests_structured_output.py
+
+# Structured output via forced tool call (OpenAI SDK)
+python advanced_usage/openai_sdk_structured_output.py

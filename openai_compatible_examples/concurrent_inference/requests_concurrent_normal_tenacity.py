@@ -5,7 +5,8 @@ import json
 import time
 import random
 from dotenv import load_dotenv
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception, RetryError
+from utils.auth_helpers import get_api_key_async # Use async version
 
 # --- Tenacity Retry Settings ---
 MAX_ATTEMPTS = 5
@@ -23,9 +24,8 @@ if not api_base:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
 chat_completions_url = f"{api_base.rstrip('/')}/chat/completions"
-headers = {
+base_headers = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}"
 }
 payloads = [
     {
@@ -61,10 +61,17 @@ def should_retry_aiohttp(exception):
     retry=retry_if_exception(should_retry_aiohttp),
     reraise=True # Reraise the exception if all retries fail
 )
-async def make_request_with_tenacity(session, url, headers, payload, request_id):
-    print(f"[Request {request_id}] Sending (attempt {make_request_with_tenacity.retry.statistics['attempt_number']})...")
-    # Note: No try/except block needed here for retries handled by tenacity
+async def send_request_with_tenacity(session, url, payload, request_id):
+    # Fetch the latest API key *before* the first attempt by tenacity
+    current_api_key = await get_api_key_async()
+    headers = {**base_headers, "Authorization": f"Bearer {current_api_key}"}
+
+    print(f"[Request {request_id}] Sending (attempt {send_request_with_tenacity.retry.statistics['attempt_number']})...")
     async with session.post(url, headers=headers, json=payload, timeout=30) as response:
+        # Raise specific errors for tenacity to catch and potentially retry
+        if response.status == 429 or response.status >= 500:
+            print(f"[Request {request_id}] Status: {response.status} - Failed")
+            return None
         response.raise_for_status() # Let tenacity catch ClientResponseError if status is bad
         response_json = await response.json()
         print(f"[Request {request_id}] Status: {response.status} - Success")
@@ -85,7 +92,7 @@ async def main():
             # Wrap the call in a separate task to handle potential final exceptions
             async def safe_request_wrapper(p, req_id):
                 try:
-                    return await make_request_with_tenacity(session, chat_completions_url, headers, p, req_id)
+                    return await send_request_with_tenacity(session, chat_completions_url, p, req_id)
                 except Exception as e:
                     print(f"[Request {req_id}] FAILED permanently after all retries: {type(e).__name__}: {e}")
                     return None # Indicate failure
