@@ -119,6 +119,10 @@ async def main():
     successful_results = [res for res in results if res is not None]
     print(f"Successfully completed {len(successful_results)} requests.")
     # You can process 'results' list here if needed
+    # raise error if there are any failed requests
+    if len(successful_results) != len(payloads):
+        raise Exception("Failed to complete all requests.")
+
 
 if __name__ == "__main__":
     # For Windows compatibility with asyncio in some environments

@@ -120,6 +120,9 @@ async def main():
     print(f"\n--- All concurrent streams with backoff finished ---")
     print(f"Total time: {end_time - start_time:.2f} seconds")
     print(f"Successful streams: {len(successful_results)}/{len(all_messages)}")
+    # raise error if there are any failed requests
+    if len(successful_results) != len(all_messages):
+        raise Exception("Failed to complete all requests.")
 
 if __name__ == "__main__":
     if os.name == 'nt':

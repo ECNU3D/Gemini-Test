@@ -23,7 +23,10 @@ model_name = os.getenv("MODEL_NAME", "gpt-4-vision-preview") # Default if not se
 if not api_base_url:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 if not image_path or not os.path.exists(image_path):
-    raise ValueError(f"Image path '{image_path}' not found or not set in .env (IMAGE_PATH).")
+    # try to fine the image in the parent directory
+    image_path = os.path.join(parent_dir, image_path)
+    if not os.path.exists(image_path):
+        raise ValueError(f"Image path '{image_path}' not found or not set in .env (IMAGE_PATH).")
 
 print(f"--- Preparing multimodal request (OpenAI SDK) --- ")
 print(f"API Base: {api_base_url}")

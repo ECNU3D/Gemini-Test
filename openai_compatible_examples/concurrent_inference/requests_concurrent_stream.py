@@ -140,6 +140,9 @@ async def main():
     print(f"Successfully completed {len(successful_results)} streams.")
     # Results contains the full text from each stream (or None if error)
     # print(f"Aggregated results: {results}")
+    # raise error if there are any failed requests
+    if len(successful_results) != len(payloads):
+        raise Exception("Failed to complete all requests.")
 
 if __name__ == "__main__":
     if os.name == 'nt':

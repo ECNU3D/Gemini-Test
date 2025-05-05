@@ -2,9 +2,11 @@ import os
 import sys
 import importlib
 import traceback
+import asyncio  # Add asyncio import
+import inspect # Add inspect import
 
 # Define the directory containing the example scripts
-EXAMPLES_DIR = "openai_compatible_examples/basic_inference"
+EXAMPLES_DIR = "openai_compatible_examples/advanced_usage"
 
 # Add the example directory and its parent to sys.path 
 # to allow imports within the examples and their utils
@@ -42,8 +44,11 @@ def run_all_examples():
 
             # Check if the module has a main function
             if hasattr(module, 'main') and callable(module.main):
-                # Execute the main function
-                module.main()
+                # Check if main is an async function
+                if inspect.iscoroutinefunction(module.main):
+                    asyncio.run(module.main()) # Run async main
+                else:
+                    module.main() # Run sync main
                 print(f"--- Success: {filename} completed successfully. ---")
                 success_count += 1
             else:

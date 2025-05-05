@@ -92,6 +92,9 @@ async def main():
     # Filter out None results from errors
     successful_results = [res for res in results if res is not None]
     print(f"Successfully completed {len(successful_results)} requests.")
+    # raise error if there are any failed requests
+    if len(successful_results) != len(all_messages):
+        raise Exception("Failed to complete all requests.")
 
 if __name__ == "__main__":
     if os.name == 'nt':

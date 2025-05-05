@@ -31,48 +31,54 @@ messages = [
     {"role": "user", "content": "Generate a response in the style you were trained on."}
 ]
 
-if not FINE_TUNED_MODEL_ID:
-    print("Error: FINE_TUNED_MODEL_NAME environment variable is not set.")
-    print("Please set it to your fine-tuned model ID to run this example.")
-else:
-    print("--- Sending request using SDK ---")
-    print(f"Using Fine-Tuned Model: {FINE_TUNED_MODEL_ID}")
-    print(f"Messages:
-{json.dumps(messages, indent=2)}")
-    print("-" * 30)
-
-    try:
-        completion = client.chat.completions.create(
-            model=FINE_TUNED_MODEL_ID, # Specify the fine-tuned model ID here
-            messages=messages,
-            max_tokens=100,
-            temperature=0.7,
-        )
-
-        print("--- Full API Response ---")
-        print(completion.model_dump_json(indent=2))
+def main():
+    if not FINE_TUNED_MODEL_ID:
+        print("Error: FINE_TUNED_MODEL_NAME environment variable is not set.")
+        print("Please set it to your fine-tuned model ID to run this example.")
+    else:
+        print("--- Sending request using SDK ---")
+        print(f"Using Fine-Tuned Model: {FINE_TUNED_MODEL_ID}")
+        print(f"Messages:\n{json.dumps(messages, indent=2)}")
         print("-" * 30)
 
-        # --- Response Handling ---
-        assistant_message = completion.choices[0].message.content
-        print(f"Assistant Message (from fine-tuned model):")
-        print(assistant_message)
+        try:
+            completion = client.chat.completions.create(
+                model=FINE_TUNED_MODEL_ID, # Specify the fine-tuned model ID here
+                messages=messages,
+                max_tokens=100,
+                temperature=0.7,
+            )
 
-    except NotFoundError as e:
-        # Specific error for model not found with the SDK
-        print(f"API Error: Model not found.")
-        print(f"The fine-tuned model ID '{FINE_TUNED_MODEL_ID}' might be incorrect or not available on the endpoint: {API_BASE_URL}")
-        print(f"Details: {e}")
+            print("--- Full API Response ---")
+            print(completion.model_dump_json(indent=2))
+            print("-" * 30)
 
-    except (APIError, RateLimitError, APITimeoutError) as e:
-        print(f"An API error occurred: {e}")
-        if hasattr(e, 'status_code'):
-            print(f"Status Code: {e.status_code}")
-        # ... (rest of standard error handling) ...
+            # --- Response Handling ---
+            assistant_message = completion.choices[0].message.content
+            print(f"Assistant Message (from fine-tuned model):")
+            print(assistant_message)
 
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        print(f"Type: {type(e)}")
+        except NotFoundError as e:
+            # Specific error for model not found with the SDK
+            print(f"API Error: Model not found.")
+            print(f"The fine-tuned model ID '{FINE_TUNED_MODEL_ID}' might be incorrect or not available on the endpoint: {API_BASE_URL}")
+            print(f"Details: {e}")
+            raise
 
-print("-" * 30)
-print("Fine-tuned model SDK example complete.") 
+        except (APIError, RateLimitError, APITimeoutError) as e:
+            print(f"An API error occurred: {e}")
+            if hasattr(e, 'status_code'):
+                print(f"Status Code: {e.status_code}")
+            # ... (rest of standard error handling) ...
+            raise
+
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            print(f"Type: {type(e)}")
+            raise
+
+    print("-" * 30)
+    print("Fine-tuned model SDK example complete.")
+
+if __name__ == "__main__":
+    main() 

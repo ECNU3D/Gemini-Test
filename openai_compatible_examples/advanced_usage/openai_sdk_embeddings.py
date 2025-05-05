@@ -35,71 +35,78 @@ input_text = [
 ]
 # input_text = "A single input string."
 
-print("--- Sending request to embeddings endpoint ---")
-print(f"Model: {EMBEDDING_MODEL_NAME}")
-print(f"Input: {input_text}")
-print("-" * 30)
-
-try:
-    response = client.embeddings.create(
-        model=EMBEDDING_MODEL_NAME,
-        input=input_text,
-        # encoding_format="float", # Optional: "float" or "base64"
-        # dimensions=1024        # Optional: If the model/endpoint supports it
-    )
-
-    print("--- Full API Response ---")
-    # Use model_dump_json for cleaner output of Pydantic models
-    print(response.model_dump_json(indent=2))
+def main():
+    print("--- Sending request to embeddings endpoint ---")
+    print(f"Model: {EMBEDDING_MODEL_NAME}")
+    print(f"Input: {input_text}")
     print("-" * 30)
 
-    # --- Response Handling ---
-    if response.data and isinstance(response.data, list):
-        print(f"Successfully received {len(response.data)} embedding(s).")
+    try:
+        response = client.embeddings.create(
+            model=EMBEDDING_MODEL_NAME,
+            input=input_text,
+            # encoding_format="float", # Optional: "float" or "base64"
+            # dimensions=1024        # Optional: If the model/endpoint supports it
+        )
 
-        for i, embedding_data in enumerate(response.data):
-            # embedding_data is an Embedding object
-            if embedding_data.embedding and isinstance(embedding_data.embedding, list):
-                embedding_vector = embedding_data.embedding
-                print(f"\n--- Embedding {i+1} ---")
-                print(f"Object Type: {embedding_data.object}")
-                print(f"Index: {embedding_data.index}")
-                print(f"Dimensions: {len(embedding_vector)}")
-                # Print only the first few dimensions for brevity
-                print(f"Vector (first 5 dims): {embedding_vector[:5]}...")
-            else:
-                print(f"Warning: Embedding data for item {i+1} seems malformed.")
-                print(embedding_data)
+        print("--- Full API Response ---")
+        # Use model_dump_json for cleaner output of Pydantic models
+        print(response.model_dump_json(indent=2))
+        print("-" * 30)
 
-        # Also print usage info if available
-        if response.usage:
-            print("\n--- Usage Information ---")
-            print(f"Prompt Tokens: {response.usage.prompt_tokens}")
-            print(f"Total Tokens: {response.usage.total_tokens}")
+        # --- Response Handling ---
+        if response.data and isinstance(response.data, list):
+            print(f"Successfully received {len(response.data)} embedding(s).")
 
-    else:
-        print("Response did not contain the expected 'data' list.")
+            for i, embedding_data in enumerate(response.data):
+                # embedding_data is an Embedding object
+                if embedding_data.embedding and isinstance(embedding_data.embedding, list):
+                    embedding_vector = embedding_data.embedding
+                    print(f"\n--- Embedding {i+1} ---")
+                    print(f"Object Type: {embedding_data.object}")
+                    print(f"Index: {embedding_data.index}")
+                    print(f"Dimensions: {len(embedding_vector)}")
+                    # Print only the first few dimensions for brevity
+                    print(f"Vector (first 5 dims): {embedding_vector[:5]}...")
+                else:
+                    print(f"Warning: Embedding data for item {i+1} seems malformed.")
+                    print(embedding_data)
 
-except (APIError, RateLimitError, APITimeoutError) as e:
-    print(f"An API error occurred: {e}")
-    if hasattr(e, 'status_code'):
-        print(f"Status Code: {e.status_code}")
-    if hasattr(e, 'response') and e.response is not None:
-        try:
-            print(f"Response Body: {e.response.text}")
-        except Exception:
-             print("Could not print response body.")
-    elif hasattr(e, 'message'):
-        print(f"Error Message: {e.message}")
+            # Also print usage info if available
+            if response.usage:
+                print("\n--- Usage Information ---")
+                print(f"Prompt Tokens: {response.usage.prompt_tokens}")
+                print(f"Total Tokens: {response.usage.total_tokens}")
 
-except KeyError as e:
-    print(f"Error accessing expected key in API response: {e}")
-    print("Response structure might be different than expected.")
-    print(response.model_dump_json(indent=2) if 'response' in locals() else "No response object")
+        else:
+            print("Response did not contain the expected 'data' list.")
 
-except Exception as e:
-    print(f"An unexpected error occurred: {e}")
-    print(f"Type: {type(e)}")
+    except (APIError, RateLimitError, APITimeoutError) as e:
+        print(f"An API error occurred: {e}")
+        if hasattr(e, 'status_code'):
+            print(f"Status Code: {e.status_code}")
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                print(f"Response Body: {e.response.text}")
+            except Exception:
+                 print("Could not print response body.")
+        elif hasattr(e, 'message'):
+            print(f"Error Message: {e.message}")
+        raise
 
-print("-" * 30)
-print("Embeddings example complete.") 
+    except KeyError as e:
+        print(f"Error accessing expected key in API response: {e}")
+        print("Response structure might be different than expected.")
+        print(response.model_dump_json(indent=2) if 'response' in locals() else "No response object")
+        raise
+
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        print(f"Type: {type(e)}")
+        raise
+
+    print("-" * 30)
+    print("Embeddings example complete.")
+
+if __name__ == "__main__":
+    main() 

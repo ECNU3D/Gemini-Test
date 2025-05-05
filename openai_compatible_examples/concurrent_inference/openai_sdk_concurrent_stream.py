@@ -112,6 +112,9 @@ async def main():
     print("--- Successful Stream Responses ---")
     for i, response in enumerate(successful_results):
         print(f"Response {i+1}:\n{response}\n---")
+    # raise error if there are any failed requests
+    if len(successful_results) != len(all_messages):
+        raise Exception("Failed to complete all requests.")
 
 
 if __name__ == "__main__":

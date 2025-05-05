@@ -95,8 +95,10 @@ def main():
 
     except requests.exceptions.RequestException as e:
         print(f"\nAn error occurred during the streaming request: {e}")
+        raise # Re-raise the exception after printing details
     except Exception as e:
         print(f"\nAn unexpected error occurred: {e}")
+        raise # Also re-raise other unexpected errors
 
 if __name__ == "__main__":
     main() 

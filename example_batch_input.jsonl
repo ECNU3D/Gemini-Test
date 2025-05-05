@@ -1,0 +1,2 @@
+{"custom_id": "req_1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "meta/llama-4-maverick-17b-128e-instruct-maas", "messages": [{"role": "user", "content": "What is 2+2?"}], "max_tokens": 10}}
+{"custom_id": "req_2", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "meta/llama-4-maverick-17b-128e-instruct-maas", "messages": [{"role": "user", "content": "Translate 'hello' to French."}], "max_tokens": 10}}

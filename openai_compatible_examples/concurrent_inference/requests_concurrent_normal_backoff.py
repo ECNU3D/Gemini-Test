@@ -116,6 +116,10 @@ async def main():
     print("\n--- All concurrent requests with backoff finished ---")
     print(f"Total time: {end_time - start_time:.2f} seconds")
     print(f"Successful requests: {len(successful_results)}/{len(payloads)}")
+    # raise error if there are any failed requests
+    if len(successful_results) != len(payloads):
+        raise Exception("Failed to complete all requests.")
+
 
 if __name__ == "__main__":
     if os.name == 'nt':

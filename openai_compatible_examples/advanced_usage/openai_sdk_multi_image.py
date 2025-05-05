@@ -38,107 +38,113 @@ IMAGE_URL_3 = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wis
 # --- Initialize OpenAI Client ---
 client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-# --- Prepare Image Data ---
-image_data_1 = None
-image_data_2 = None
+def main():
+    # --- Prepare Image Data ---
+    image_data_1 = None
+    image_data_2 = None
 
-if IMAGE_PATH_1 and os.path.exists(IMAGE_PATH_1):
-    image_data_1 = encode_image_to_base64(IMAGE_PATH_1)
-    print(f"Encoded image 1 ({IMAGE_PATH_1}) to base64 data URL.")
-elif IMAGE_PATH_1:
-    print(f"Warning: Image path 1 '{IMAGE_PATH_1}' not found. Skipping.")
+    if IMAGE_PATH_1 and os.path.exists(IMAGE_PATH_1):
+        image_data_1 = encode_image_to_base64(IMAGE_PATH_1)
+        print(f"Encoded image 1 ({IMAGE_PATH_1}) to base64 data URL.")
+    elif IMAGE_PATH_1:
+        print(f"Warning: Image path 1 '{IMAGE_PATH_1}' not found. Skipping.")
 
-if os.path.exists(IMAGE_PATH_2):
-    image_data_2 = encode_image_to_base64(IMAGE_PATH_2)
-    print(f"Encoded image 2 ({IMAGE_PATH_2}) to base64 data URL.")
-else:
-    print(f"Warning: Image path 2 '{IMAGE_PATH_2}' not found. Ensure this file exists.")
+    if os.path.exists(IMAGE_PATH_2):
+        image_data_2 = encode_image_to_base64(IMAGE_PATH_2)
+        print(f"Encoded image 2 ({IMAGE_PATH_2}) to base64 data URL.")
+    else:
+        print(f"Warning: Image path 2 '{IMAGE_PATH_2}' not found. Ensure this file exists.")
 
-# --- API Request --- 
-# Construct the message list for the SDK
-content_list = [
-    {
-        "type": "text",
-        "text": "Describe the contents of these images and identify the main subject in each."
-    },
-]
+    # --- API Request --- 
+    # Construct the message list for the SDK
+    content_list = [
+        {
+            "type": "text",
+            "text": "Describe the contents of these images and identify the main subject in each."
+        },
+    ]
 
-# Add image 1 (if available)
-if image_data_1:
+    # Add image 1 (if available)
+    if image_data_1:
+        content_list.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image_data_1, # Base64 Data URL
+                    # "detail": "high" # Optional: low, high, auto
+                }
+            }
+        )
+
+    # Add image 2 (if available)
+    if image_data_2:
+         content_list.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image_data_2 # Base64 Data URL
+                }
+            }
+        )
+
+    # Add image 3 (from URL)
     content_list.append(
         {
             "type": "image_url",
             "image_url": {
-                "url": image_data_1, # Base64 Data URL
-                # "detail": "high" # Optional: low, high, auto
+                "url": IMAGE_URL_3 # Direct URL
             }
         }
     )
 
-# Add image 2 (if available)
-if image_data_2:
-     content_list.append(
+    messages = [
         {
-            "type": "image_url",
-            "image_url": {
-                "url": image_data_2 # Base64 Data URL
-            }
+            "role": "user",
+            "content": content_list
         }
-    )
+    ]
 
-# Add image 3 (from URL)
-content_list.append(
-    {
-        "type": "image_url",
-        "image_url": {
-            "url": IMAGE_URL_3 # Direct URL
-        }
-    }
-)
-
-messages = [
-    {
-        "role": "user",
-        "content": content_list
-    }
-]
-
-if not MODEL_NAME:
-    print("Error: MODEL_NAME environment variable must be set to a vision model.")
-else:
-    print(f"--- Sending request with multiple images using SDK ---")
-    # Avoid printing full base64 data in log
-    log_messages = json.loads(json.dumps(messages))
-    for msg in log_messages:
-        if isinstance(msg.get("content"), list):
-            for item in msg["content"]:
-                if item.get("type") == "image_url" and item.get("image_url", {}).get("url", "").startswith("data:"):
-                    item["image_url"]["url"] = item["image_url"]["url"][:50] + "...[TRUNCATED BASE64]..."
-    print(f"Messages Structure: \
+    if not MODEL_NAME:
+        print("Error: MODEL_NAME environment variable must be set to a vision model.")
+    else:
+        print(f"--- Sending request with multiple images using SDK ---")
+        # Avoid printing full base64 data in log
+        log_messages = json.loads(json.dumps(messages))
+        for msg in log_messages:
+            if isinstance(msg.get("content"), list):
+                for item in msg["content"]:
+                    if item.get("type") == "image_url" and item.get("image_url", {}).get("url", "").startswith("data:"):
+                        item["image_url"]["url"] = item["image_url"]["url"][:50] + "...[TRUNCATED BASE64]..."
+        print(f"Messages Structure: \
 {json.dumps(log_messages, indent=2)}")
-    print("-" * 30)
-
-    try:
-        completion = client.chat.completions.create(
-            model=MODEL_NAME, # Must be a vision model
-            messages=messages,
-            max_tokens=300,
-        )
-
-        print("--- Full API Response ---")
-        print(completion.model_dump_json(indent=2))
         print("-" * 30)
 
-        assistant_message = completion.choices[0].message.content
-        print(f"Assistant Message: \
+        try:
+            completion = client.chat.completions.create(
+                model=MODEL_NAME, # Must be a vision model
+                messages=messages,
+                max_tokens=300,
+            )
+
+            print("--- Full API Response ---")
+            print(completion.model_dump_json(indent=2))
+            print("-" * 30)
+
+            assistant_message = completion.choices[0].message.content
+            print(f"Assistant Message: \
 {assistant_message}")
 
-    except (APIError, RateLimitError, APITimeoutError) as e:
-        print(f"An API error occurred: {e}")
-        # ... (rest of error handling) ...
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        print(f"Type: {type(e)}")
+        except (APIError, RateLimitError, APITimeoutError) as e:
+            print(f"An API error occurred: {e}")
+            raise
+            # ... (rest of error handling) ...
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            print(f"Type: {type(e)}")
+            raise
 
-print("-" * 30)
-print("Multi-image SDK example complete.") 
+    print("-" * 30)
+    print("Multi-image SDK example complete.")
+
+if __name__ == "__main__":
+    main() 

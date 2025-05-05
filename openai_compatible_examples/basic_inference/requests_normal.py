@@ -78,8 +78,10 @@ def main():
 
     except requests.exceptions.RequestException as e:
         print(f"An error occurred during the request: {e}")
+        raise
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+        raise
 
 if __name__ == "__main__":
     main() 

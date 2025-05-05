@@ -27,7 +27,10 @@ image_path = os.getenv("IMAGE_PATH")
 if not api_base:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 if not image_path or not os.path.exists(image_path):
-    raise ValueError(f"Image path '{image_path}' not found or not set in .env (IMAGE_PATH).")
+    # try to fine the image in the parent directory
+    image_path = os.path.join(parent_dir, image_path)
+    if not os.path.exists(image_path):
+        raise ValueError(f"Image path '{image_path}' not found or not set in .env (IMAGE_PATH).")
 
 print(f"--- Preparing multimodal request --- ")
 print(f"API Base: {api_base}")
@@ -37,10 +40,6 @@ print(f"Image Path: {image_path}")
 # Encode the image
 try:
     base64_image_data_uri = encode_image_to_base64(image_path)
-    # persist the base64_image_data_uri to a file
-    with open("base64_image_data_uri_2.txt", "w") as f:
-        f.write(base64_image_data_uri)
-
     print(f"Successfully encoded image (truncated): {base64_image_data_uri[:80]}...")
 except (FileNotFoundError, ValueError) as e:
     print(f"Error encoding image: {e}")

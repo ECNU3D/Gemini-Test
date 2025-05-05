@@ -76,6 +76,7 @@ def main():
     except Exception as e:
         # Handle other potential errors
         print(f"An unexpected error occurred: {e}")
+        raise
 
 if __name__ == "__main__":
     main()

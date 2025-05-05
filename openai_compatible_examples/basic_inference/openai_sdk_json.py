@@ -96,9 +96,11 @@ def main():
         print(f"An API error occurred: {e}")
         print(f"Status Code: {e.status_code}")
         print(f"Response: {e.response}")
+        raise # Re-raise the exception after printing details
     except Exception as e:
         # Handle other potential errors
         print(f"An unexpected error occurred: {e}")
+        raise # Also re-raise other unexpected errors
 
 if __name__ == "__main__":
     main() 

@@ -106,8 +106,10 @@ def main():
         if hasattr(e, 'response') and e.response is not None:
             print(f"Response status code: {e.response.status_code}")
             print(f"Response text: {e.response.text}")
+        raise
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+        raise
 
 if __name__ == "__main__":
     main() 

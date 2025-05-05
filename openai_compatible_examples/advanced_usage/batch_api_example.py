@@ -66,7 +66,7 @@ def create_dummy_batch_file(filepath):
         return False
 
 # --- Main Batch API Interaction ---
-def run_batch_example():
+def main():
     batch_file_id = None
     batch_job_id = None
 
@@ -91,8 +91,7 @@ def run_batch_example():
             )
         batch_file_id = batch_file_object.id
         print(f"File uploaded successfully. File ID: {batch_file_id}")
-        print(f"File Object:
-{batch_file_object.model_dump_json(indent=2)}")
+        print(f"File Object:\\n{batch_file_object.model_dump_json(indent=2)}")
         print("-" * 30)
 
         # 3. Create the Batch Job
@@ -107,8 +106,7 @@ def run_batch_example():
         )
         batch_job_id = batch_job.id
         print(f"Batch job created successfully. Batch ID: {batch_job_id}")
-        print(f"Batch Object:
-{batch_job.model_dump_json(indent=2)}")
+        print(f"Batch Object:\\n{batch_job.model_dump_json(indent=2)}")
         print("-" * 30)
 
         # 4. Poll for Batch Job Status
@@ -120,8 +118,7 @@ def run_batch_example():
 
             if status in ["completed", "failed", "cancelled", "expired"]:
                 print(f"Batch job finished with status: {status}")
-                print(f"Final Batch Object:
-{batch_job_status.model_dump_json(indent=2)}")
+                print(f"Final Batch Object:\\n{batch_job_status.model_dump_json(indent=2)}")
                 break # Exit the polling loop
 
             # Wait before polling again (e.g., 30 seconds)
@@ -180,13 +177,16 @@ def run_batch_example():
                  print("Could not print response body.")
         elif hasattr(e, 'message'):
             print(f"Error Message: {e.message}")
+        raise
 
     except FileNotFoundError:
         print(f"Error: Batch input file not found at '{BATCH_INPUT_FILE_PATH}'")
+        raise
 
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         print(f"Type: {type(e)}")
+        raise
 
     finally:
         # Optional: Clean up uploaded file and local dummy file
@@ -212,4 +212,4 @@ def run_batch_example():
 
 
 if __name__ == "__main__":
-    run_batch_example() 
+    main() 
