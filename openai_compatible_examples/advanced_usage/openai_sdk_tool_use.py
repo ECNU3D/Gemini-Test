@@ -8,15 +8,25 @@ to parse the response.
 
 import os
 import json
+import sys
 from dotenv import load_dotenv
 from openai import OpenAI, APIError, APITimeoutError, RateLimitError
+
+
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+from utils.auth_helpers import get_api_key # Use async version
 
 # --- Configuration ---
 load_dotenv() # Load environment variables from .env file
 
 # Get endpoint and API key from environment variables
 API_BASE_URL = os.getenv("OPENAI_API_BASE", "http://localhost:8000/v1")
-API_KEY = os.getenv("OPENAI_API_KEY", "dummy-key")
+API_KEY = get_api_key() # Use the function to get the API key
 MODEL_NAME = os.getenv("MODEL_NAME") # Optional: If endpoint supports model selection
 
 # --- Initialize OpenAI Client ---
@@ -95,7 +105,7 @@ try:
 
             print(f"Tool Call ID: {tool_call.id}")
             print(f"Function Name: {function_name}")
-            print(f"Arguments:
+            print(f"Arguments: \
 {json.dumps(function_args, indent=2)}")
 
             if function_name == "get_current_weather":
@@ -132,7 +142,9 @@ try:
 
         # --- Sending Tool Results Back to Model ---
         print("--- Sending tool results back to model ---")
-        print(f"Updated Messages: {json.dumps(messages, indent=2)}")
+        # Convert message objects (like ChatCompletionMessage) to dicts for JSON serialization
+        serializable_messages = [m.model_dump() if hasattr(m, 'model_dump') else m for m in messages]
+        print(f"Updated Messages: {json.dumps(serializable_messages, indent=2)}")
         print("-" * 30)
 
         follow_up_completion = client.chat.completions.create(
@@ -146,14 +158,14 @@ try:
         print("-" * 30)
 
         final_message = follow_up_completion.choices[0].message.content
-        print(f"Final Assistant Message:
+        print(f"Final Assistant Message: \
 {final_message}")
 
     else:
         # The model generated a normal text response directly
         final_message = response_message.content
         print("--- Model generated text response directly ---")
-        print(f"Assistant Message:
+        print(f"Assistant Message: \
 {final_message}")
 
 

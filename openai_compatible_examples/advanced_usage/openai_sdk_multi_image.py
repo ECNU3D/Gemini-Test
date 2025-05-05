@@ -14,7 +14,7 @@ from openai import OpenAI, APIError, APITimeoutError, RateLimitError
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 try:
-    from image_helpers import image_to_base64_data_url
+    from utils.image_helpers import image_to_base64_data_url
 except ImportError:
     print("Error: image_helpers.py not found. Please ensure it's in the 'utils' directory.")
     def image_to_base64_data_url(image_path):

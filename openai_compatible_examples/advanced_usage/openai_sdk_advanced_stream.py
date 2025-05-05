@@ -8,19 +8,32 @@ tool calls (functions) as they arrive in the stream.
 
 import os
 import json
+import sys # Add sys import
 from collections import defaultdict
 from dotenv import load_dotenv
 from openai import OpenAI, APIError, APITimeoutError, RateLimitError
+
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+from utils.auth_helpers import get_api_key # Import the synchronous helper
 
 # --- Configuration ---
 load_dotenv() # Load environment variables from .env file
 
 API_BASE_URL = os.getenv("OPENAI_API_BASE", "http://localhost:8000/v1")
-API_KEY = os.getenv("OPENAI_API_KEY", "dummy-key")
+# API_KEY = os.getenv("OPENAI_API_KEY", "dummy-key") # Original line
+API_KEY = get_api_key() # Fetch key using the helper function
 MODEL_NAME = os.getenv("MODEL_NAME") # Optional: If endpoint supports model selection
 
 # --- Initialize OpenAI Client ---
 client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+print(f"API_KEY: {API_KEY}")
+print(f"API_BASE_URL: {API_BASE_URL}")
+print(f"MODEL_NAME: {MODEL_NAME}")
 
 # --- Tool Definition (for streaming tool calls) ---
 tools = [
@@ -61,13 +74,14 @@ try:
         model=MODEL_NAME,
         messages=messages,
         tools=tools,
-        tool_choice="auto", # Or force a tool: {"type": "function", "function": {"name": "get_stock_price"}}
+        # tool_choice="auto", # Or force a tool: {"type": "function", "function": {"name": "get_stock_price"}}
+        tool_choice={"type": "function", "function": {"name": "get_stock_price"}},
         stream=True,
         temperature=0.7,
     )
 
     for chunk in stream:
-        # print(f"Raw Chunk: {chunk.model_dump_json(indent=2)}") # Debugging
+        print(f"Raw Chunk: {chunk.model_dump_json(indent=2)}") # Debugging
         if not chunk.choices:
             # Handle potential non-standard chunks or empty choices
             print(f"Received non-standard chunk: {chunk}")
@@ -136,10 +150,19 @@ try:
         print("-" * 30)
 
 except (APIError, RateLimitError, APITimeoutError) as e:
-    print(f"\nAn API error occurred: {e}")
-    # ... (rest of error handling as in previous SDK examples) ...
+    print(f"\n--- OpenAI API Error Occurred ---")
+    print(f"Error Type: {type(e)}")
+    print(f"Status Code: {e.status_code if hasattr(e, 'status_code') else 'N/A'}")
+    print(f"Message: {e}")
+    # You can access more details if needed, e.g., e.request, e.body
+    # print(f"Request: {e.request}")
+    # print(f"Body: {e.body}")
 except Exception as e:
-    print(f"\nAn unexpected error occurred: {e}")
-    print(f"Type: {type(e)}")
+    print(f"\n--- An Unexpected Error Occurred ---")
+    print(f"Error Type: {type(e)}")
+    print(f"Message: {e}")
+    # Consider adding traceback for unexpected errors
+    import traceback
+    traceback.print_exc()
 
 print("Advanced streaming SDK example complete.") 
