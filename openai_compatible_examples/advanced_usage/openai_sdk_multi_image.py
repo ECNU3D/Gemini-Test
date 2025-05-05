@@ -6,26 +6,25 @@ Requires a model capable of processing image inputs (vision model).
 """
 
 import os
-import json
+import json 
+import sys
 from dotenv import load_dotenv
 from openai import OpenAI, APIError, APITimeoutError, RateLimitError
 
 # Assuming image_helpers.py exists in ../utils
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
-try:
-    from utils.image_helpers import image_to_base64_data_url
-except ImportError:
-    print("Error: image_helpers.py not found. Please ensure it's in the 'utils' directory.")
-    def image_to_base64_data_url(image_path):
-        print(f"[Dummy] Pretending to encode: {image_path}")
-        return "data:image/jpeg;base64,DUMMY_BASE64_DATA"
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 
+from utils.auth_helpers import get_api_key # Use async version
+from utils.image_helpers import encode_image_to_base64
 # --- Configuration ---
 load_dotenv() # Load environment variables from .env file
 
 API_BASE_URL = os.getenv("OPENAI_API_BASE", "http://localhost:8000/v1")
-API_KEY = os.getenv("OPENAI_API_KEY", "dummy-key")
+API_KEY = get_api_key()
 # Ensure MODEL_NAME is set to a vision-capable model in your .env file
 MODEL_NAME = os.getenv("MODEL_NAME")
 
@@ -44,13 +43,13 @@ image_data_1 = None
 image_data_2 = None
 
 if IMAGE_PATH_1 and os.path.exists(IMAGE_PATH_1):
-    image_data_1 = image_to_base64_data_url(IMAGE_PATH_1)
+    image_data_1 = encode_image_to_base64(IMAGE_PATH_1)
     print(f"Encoded image 1 ({IMAGE_PATH_1}) to base64 data URL.")
 elif IMAGE_PATH_1:
     print(f"Warning: Image path 1 '{IMAGE_PATH_1}' not found. Skipping.")
 
 if os.path.exists(IMAGE_PATH_2):
-    image_data_2 = image_to_base64_data_url(IMAGE_PATH_2)
+    image_data_2 = encode_image_to_base64(IMAGE_PATH_2)
     print(f"Encoded image 2 ({IMAGE_PATH_2}) to base64 data URL.")
 else:
     print(f"Warning: Image path 2 '{IMAGE_PATH_2}' not found. Ensure this file exists.")
@@ -115,7 +114,7 @@ else:
             for item in msg["content"]:
                 if item.get("type") == "image_url" and item.get("image_url", {}).get("url", "").startswith("data:"):
                     item["image_url"]["url"] = item["image_url"]["url"][:50] + "...[TRUNCATED BASE64]..."
-    print(f"Messages Structure:
+    print(f"Messages Structure: \
 {json.dumps(log_messages, indent=2)}")
     print("-" * 30)
 
@@ -131,7 +130,7 @@ else:
         print("-" * 30)
 
         assistant_message = completion.choices[0].message.content
-        print(f"Assistant Message:
+        print(f"Assistant Message: \
 {assistant_message}")
 
     except (APIError, RateLimitError, APITimeoutError) as e:
