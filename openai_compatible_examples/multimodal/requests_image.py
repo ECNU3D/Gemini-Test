@@ -2,6 +2,7 @@ import os
 import sys
 import requests
 import json
+import copy
 from dotenv import load_dotenv
 
 # Add the parent directory (openai_compatible_examples) to sys.path
@@ -35,8 +36,12 @@ print(f"Image Path: {image_path}")
 
 # Encode the image
 try:
-    base64_image_url = encode_image_to_base64(image_path)
-    print(f"Successfully encoded image (truncated): {base64_image_url[:80]}...")
+    base64_image_data_uri = encode_image_to_base64(image_path)
+    # persist the base64_image_data_uri to a file
+    with open("base64_image_data_uri_2.txt", "w") as f:
+        f.write(base64_image_data_uri)
+
+    print(f"Successfully encoded image (truncated): {base64_image_data_uri[:80]}...")
 except (FileNotFoundError, ValueError) as e:
     print(f"Error encoding image: {e}")
     sys.exit(1) # Exit if image encoding fails
@@ -68,7 +73,7 @@ data = {
                 {
                     "type": "image_url",
                     "image_url": {
-                        "url": base64_image_url
+                        "url": f"{base64_image_data_uri}" # Pass the raw content
                     }
                 }
             ]
@@ -77,14 +82,17 @@ data = {
     "max_tokens": 100 # Adjust max_tokens as needed for image descriptions
 }
 
+
 print(f"--- Sending multimodal request to: {chat_completions_url} ---")
 # Avoid printing the full base64 string in the payload log
-payload_log = data.copy()
-payload_log["messages"][0]["content"][1]["image_url"]["url"] = f"{base64_image_url[:50]}...<truncated>"
+payload_log = copy.deepcopy(data)
+# Use the original data URI for logging if needed, or adjust logging as preferred
+payload_log["messages"][0]["content"][1]["image_url"]["url"] = f"{base64_image_data_uri[:50]}...<truncated>"
 print(f"Payload (image truncated): {json.dumps(payload_log, indent=2)}")
 print("---")
 
 def main():
+    global headers
     try:
         # Fetch the latest API key
         current_api_key = get_api_key()

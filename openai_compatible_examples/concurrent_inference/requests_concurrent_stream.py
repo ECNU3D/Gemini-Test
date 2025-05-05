@@ -3,7 +3,15 @@ import asyncio
 import aiohttp
 import json
 import time
+import sys
 from dotenv import load_dotenv
+
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 from utils.auth_helpers import get_api_key_async
 
 # Load environment variables from .env file
@@ -58,6 +66,8 @@ async def process_stream(response, request_id):
             elif line_str: # Handle potential empty lines or other data
                 print(f"\n[Stream {request_id}] Received non-SSE line: {line_str}")
 
+    except aiohttp.ClientPayloadError as e: # More specific error for payload issues
+        print(f"\n[Stream {request_id}] Payload Error during stream processing: {e}")
     except Exception as e:
         print(f"\n[Stream {request_id}] Error processing stream: {e}")
     finally:
@@ -72,18 +82,45 @@ async def make_streaming_request(session, url, headers, payload, request_id):
         current_api_key = await get_api_key_async()
         headers = {**headers, "Authorization": f"Bearer {current_api_key}"}
 
-        async with session.post(url, headers=headers, json=payload, timeout=60) as response:
-            response.raise_for_status()
+        # Get proxy from environment variables
+        http_proxy = os.getenv("HTTP_PROXY")
+        https_proxy = os.getenv("HTTPS_PROXY")
+
+        # Determine which proxy to use based on the URL scheme
+        proxy_to_use = None
+        if url.startswith("https://") and https_proxy:
+            proxy_to_use = https_proxy
+        elif url.startswith("http://") and http_proxy:
+            proxy_to_use = http_proxy
+
+        # Use timeout=None for streaming requests potentially lasting longer
+        async with session.post(url, headers=headers, json=payload, timeout=None, proxy=proxy_to_use) as response:
+            response.raise_for_status() # Check for HTTP errors early
             print(f"[Stream {request_id}] Connection successful (Status: {response.status})")
             result = await process_stream(response, request_id)
             return result
-    except aiohttp.ClientError as e:
-        print(f"[Stream {request_id}] Connection Error: {e}")
+    except aiohttp.ClientResponseError as e: # Specific handling for HTTP status errors
+        print(f"\n[Stream {request_id}] HTTP Error: Status {e.status} - {e.message}")
+        try:
+            # Attempt to read the error body for more context
+            error_body = await response.text()
+            print(f"[Stream {request_id}] Error Body: {error_body[:500]}") # Log first 500 chars
+        except Exception as read_err:
+            print(f"[Stream {request_id}] Could not read error body: {read_err}")
+        return None
+    except aiohttp.ClientConnectionError as e:
+        print(f"\n[Stream {request_id}] Connection Error: {e}")
+        return None
+    except asyncio.TimeoutError:
+        print(f"\n[Stream {request_id}] Request timed out.") # Specific timeout message
+        return None
+    except Exception as e: # Catch other potential errors
+        print(f"\n[Stream {request_id}] An unexpected error occurred: {e}")
         return None
 
 async def main():
     print(f"--- Sending {len(payloads)} concurrent streaming requests using aiohttp ---")
-    print(f"Target URL: {chat_completions_url}")
+    print(f"Base URL: {api_base}")
     print(f"Model: {model_name}")
     print("---")
 
@@ -98,6 +135,9 @@ async def main():
     end_time = time.time()
     print(f"\n--- All concurrent streams finished ---")
     print(f"Total time: {end_time - start_time:.2f} seconds")
+    # Add count of successful requests
+    successful_results = [res for res in results if res is not None]
+    print(f"Successfully completed {len(successful_results)} streams.")
     # Results contains the full text from each stream (or None if error)
     # print(f"Aggregated results: {results}")
 

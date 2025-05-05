@@ -1,9 +1,17 @@
 import os
 import asyncio
 import time
+import sys
 from openai import AsyncOpenAI, APIError
 from openai.types.chat import ChatCompletionChunk # For type hinting
 from dotenv import load_dotenv
+
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 from utils.auth_helpers import get_api_key_async # Use async version
 
 # Load environment variables from .env file
@@ -26,13 +34,13 @@ if not api_base_url:
 # Define multiple message sets for concurrent requests
 all_messages = [
     [
-        {"role": "user", "content": f"Write a short story {i+1} about a brave knight"}
+        {"role": "user", "content": "Write a short story about a brave knight"}
     ],
     [
-        {"role": "user", "content": f"Write a short story {i+1} about a clever fox"}
+        {"role": "user", "content": "Write a short story about a clever fox"}
     ],
     [
-        {"role": "user", "content": f"Write a short story {i+1} about a lonely robot"}
+        {"role": "user", "content": "Write a short story about a lonely robot"}
     ]
 ]
 
@@ -43,7 +51,7 @@ async def process_openai_stream(stream, request_id):
         async for chunk in stream:
             content_piece = chunk.choices[0].delta.content or ""
             if content_piece:
-                print(f"[Stream {request_id}] {content_piece}", end="", flush=True)
+                print(f"\n[Stream {request_id}] {content_piece}", end="", flush=True)
                 full_content += content_piece
         print(f"\n[Stream {request_id}] Stream finished.") # Newline after stream finishes
     except APIError as e:
@@ -101,6 +109,9 @@ async def main():
     # print(f"Aggregated results: {results}")
     successful_results = [res for res in results if res is not None]
     print(f"Successfully completed {len(successful_results)} streams.")
+    print("--- Successful Stream Responses ---")
+    for i, response in enumerate(successful_results):
+        print(f"Response {i+1}:\n{response}\n---")
 
 
 if __name__ == "__main__":

@@ -44,14 +44,15 @@ def main():
         llm = ChatOpenAI(
             openai_api_base=api_base_url,
             model_name=model_name,
-            openai_api_key="temp-key", # Placeholder, updated before invoke
+            openai_api_key=api_key, # Placeholder, updated before invoke
             temperature=0.7,
             max_tokens=50,
             # streaming=True, # Uncomment for streaming example
         )
 
         # Fetch the latest API key and update the client
-        llm.openai_api_key = get_api_key()
+        # TODO: Uncomment this when the API key is updated, below approach doesn't work
+        # llm.openai_api_key = get_api_key()
 
         # Prepare the input message
         messages = [HumanMessage(content="Explain the difference between a virtual machine and a container.")]

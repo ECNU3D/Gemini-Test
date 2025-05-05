@@ -3,7 +3,6 @@ import sys
 from openai import OpenAI
 from dotenv import load_dotenv
 
-
 # Add the parent directory (openai_compatible_examples) to sys.path
 # to allow importing from the 'utils' module
 current_dir = os.path.dirname(os.path.abspath(__file__))

@@ -1,9 +1,17 @@
 import os
 import asyncio
 import time
+import sys
 import random
 from openai import AsyncOpenAI, APIError, RateLimitError
 from dotenv import load_dotenv
+
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 from utils.auth_helpers import get_api_key_async # Use async version
 
 # Load environment variables from .env file
@@ -27,13 +35,13 @@ if not api_base_url:
 # Define multiple message sets for concurrent requests
 all_messages = [
     [
-        {"role": "user", "content": f"Explain concept {i+1} simply: Quantum Entanglement"}
+        {"role": "user", "content": "Explain concept simply: Quantum Entanglement"}
     ],
     [
-        {"role": "user", "content": f"Explain concept {i+1} simply: Blockchain"}
+        {"role": "user", "content": "Explain concept simply: Blockchain"}
     ],
     [
-        {"role": "user", "content": f"Explain concept {i+1} simply: General Relativity"}
+        {"role": "user", "content": "Explain concept simply: General Relativity"}
     ]
 ]
 

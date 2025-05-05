@@ -15,9 +15,10 @@ from utils.auth_helpers import get_api_key
 # Load environment variables from .env file
 load_dotenv()
 
-# Get API details and image path from environment variables
+# Get API details, image path, and model name from environment variables
 api_base_url = os.getenv("OPENAI_API_BASE")
 image_path = os.getenv("IMAGE_PATH")
+model_name = os.getenv("MODEL_NAME", "gpt-4-vision-preview") # Default if not set
 
 if not api_base_url:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
@@ -27,11 +28,13 @@ if not image_path or not os.path.exists(image_path):
 print(f"--- Preparing multimodal request (OpenAI SDK) --- ")
 print(f"API Base: {api_base_url}")
 print(f"Image Path: {image_path}")
+print(f"Model Name: {model_name}")
 
 def main():
     print("--- Sending image request using OpenAI SDK ---")
     print(f"Base URL: {api_base_url}")
     print(f"Image Path: {image_path}")
+    print(f"Model Name: {model_name}")
     print("---")
 
     # Encode the image
@@ -62,9 +65,7 @@ def main():
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": base64_image_data_uri,
-                            # Optional: detail level (low, high, auto) - defaults to auto
-                            # "detail": "high"
+                            "url": base64_image_data_uri
                         }
                     }
                 ]
@@ -92,7 +93,7 @@ def main():
 
         # Make the API call
         chat_completion = client.chat.completions.create(
-            model="gpt-4-vision-preview",
+            model=model_name,
             messages=messages,
             max_tokens=150 # Adjust as needed
         )
