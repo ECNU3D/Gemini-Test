@@ -18,6 +18,7 @@
         <openai-java.version>0.20.0</openai-java.version> <!-- Use a recent version -->
         <jackson.version>2.16.0</jackson.version> <!-- For JSON handling in HTTP examples -->
         <dotenv-java.version>3.0.0</dotenv-java.version> <!-- For loading .env files -->
+        <langchain4j.version>0.30.0</langchain4j.version> <!-- Langchain4j version -->
     </properties>
 
     <dependencies>
@@ -63,6 +64,13 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>2.0.9</version>
+        </dependency>
+
+        <!-- Langchain4j OpenAI Integration -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>${langchain4j.version}</version>
         </dependency>
 
     </dependencies>
