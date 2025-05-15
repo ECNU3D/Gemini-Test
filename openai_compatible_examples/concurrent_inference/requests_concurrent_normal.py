@@ -70,7 +70,7 @@ async def send_request(session, url, payload, request_id):
         # if proxy_to_use:
         #     print(f"[Request {request_id}] Using Proxy: {proxy_to_use}") # Removed for similarity
 
-        async with session.post(url, headers=headers, json=payload, timeout=30, proxy=proxy_to_use) as response:
+        async with session.post(url, headers=headers, json=payload, timeout=60, proxy=proxy_to_use) as response:
             response_data = await response.json()
             response.raise_for_status() # Raise an exception for bad status codes
             # print(f"[Request {request_id}] Status: {response.status}") # Removed for similarity
@@ -89,6 +89,9 @@ async def send_request(session, url, payload, request_id):
             print(f"[Request {request_id}] Error Body: {error_body[:500]}") # Log first 500 chars
         except Exception:
             pass # Ignore if cannot read body
+        return None
+    except asyncio.TimeoutError: # Specific exception for timeout
+        print(f"[Request {request_id}] Request timed out after 1 minute.")
         return None
     except Exception as e:
         # print(f"[Request {request_id}] Error Type: {type(e)}") # Simplified error logging

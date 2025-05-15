@@ -94,7 +94,7 @@ async def make_streaming_request(session, url, headers, payload, request_id):
             proxy_to_use = http_proxy
 
         # Use timeout=None for streaming requests potentially lasting longer
-        async with session.post(url, headers=headers, json=payload, timeout=None, proxy=proxy_to_use) as response:
+        async with session.post(url, headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=60), proxy=proxy_to_use) as response:
             response.raise_for_status() # Check for HTTP errors early
             print(f"[Stream {request_id}] Connection successful (Status: {response.status})")
             result = await process_stream(response, request_id)

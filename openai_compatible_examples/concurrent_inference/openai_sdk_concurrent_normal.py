@@ -22,6 +22,8 @@ api_base_url = os.getenv("OPENAI_API_BASE")
 api_key = os.getenv("OPENAI_API_KEY", "dummy-key")
 model_name = os.getenv("MODEL_NAME", "default-model")
 
+REQUEST_TIMEOUT = 60  # Timeout in seconds (1 minute)
+
 if not api_base_url:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
@@ -55,16 +57,21 @@ async def send_openai_request(messages, request_id):
             api_key=await get_api_key_async()
         )
 
-        response = await aclient.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            max_tokens=100,
-            temperature=0.7,
-            stream=False
+        response = await asyncio.wait_for(
+            aclient.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=100,
+                temperature=0.7,
+                stream=False
+            ),
+            timeout=REQUEST_TIMEOUT
         )
         print(f"[Request {request_id}] Received Response:")
         print(f"[Request {request_id}] {response.choices[0].message.content.strip()}")
         return response
+    except asyncio.TimeoutError:
+        print(f"[Request {request_id}] Timed out after {REQUEST_TIMEOUT} seconds.")
     except APIError as e:
         print(f"[Request {request_id}] OpenAI API Error: {e}")
     except Exception as e:

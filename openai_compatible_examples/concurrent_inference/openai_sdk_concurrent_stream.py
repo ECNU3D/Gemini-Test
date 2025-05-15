@@ -22,6 +22,8 @@ api_base_url = os.getenv("OPENAI_API_BASE")
 api_key = os.getenv("OPENAI_API_KEY", "dummy-key")
 model_name = os.getenv("MODEL_NAME", "default-model")
 
+REQUEST_TIMEOUT = 60  # Timeout in seconds (1 minute)
+
 if not api_base_url:
     raise ValueError("OPENAI_API_BASE environment variable not set.")
 
@@ -72,16 +74,21 @@ async def run_openai_stream(messages, request_id):
             api_key=await get_api_key_async()
         )
 
-        stream = await aclient.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            max_tokens=100,
-            temperature=0.7,
-            stream=True
-        )
-        # Process the stream in this task
-        result = await process_openai_stream(stream, request_id)
+        async def stream_with_processing():
+            stream = await aclient.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=100,
+                temperature=0.7,
+                stream=True
+            )
+            # Process the stream in this task
+            return await process_openai_stream(stream, request_id)
+
+        result = await asyncio.wait_for(stream_with_processing(), timeout=REQUEST_TIMEOUT)
         return result
+    except asyncio.TimeoutError:
+        print(f"\n[Stream {request_id}] Timed out after {REQUEST_TIMEOUT} seconds.")
     except APIError as e:
         print(f"\n[Stream {request_id}] OpenAI API Error on create: {e}")
     except Exception as e:
