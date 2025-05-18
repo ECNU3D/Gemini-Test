@@ -7,8 +7,17 @@ Demonstrates how to discourage the model from repeating tokens or topics.
 """
 
 import os
+import sys
 from dotenv import load_dotenv
 from openai import OpenAI, APIError, APITimeoutError, RateLimitError
+
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+from utils.auth_helpers import get_api_key
 
 # --- Configuration ---
 load_dotenv() # Load environment variables from .env file
@@ -59,6 +68,7 @@ def generate_completion_with_penalties(
     print("-" * 30)
 
     try:
+        client.api_key = get_api_key()
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
