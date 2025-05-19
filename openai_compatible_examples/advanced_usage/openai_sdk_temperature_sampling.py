@@ -7,22 +7,31 @@ Demonstrates how to influence the randomness and creativity of the model's outpu
 
 import os
 import json
+import sys # Added import
 from dotenv import load_dotenv
 from openai import OpenAI, APIError, APITimeoutError, RateLimitError
 
 # --- Configuration ---
 load_dotenv() # Load environment variables from .env file
 
-# Get endpoint and API key from environment variables
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+from utils.auth_helpers import get_api_key # Added import
+
+# Get endpoint from environment variables
 API_BASE_URL = os.getenv("OPENAI_API_BASE", "http://localhost:8000/v1")
-API_KEY = os.getenv("OPENAI_API_KEY", "dummy-key")
+# API_KEY = os.getenv("OPENAI_API_KEY", "dummy-key") # Removed static API_KEY loading
 MODEL_NAME = os.getenv("MODEL_NAME") # Optional: If endpoint supports model selection
 
 # --- Initialize OpenAI Client ---
 # Point the client to the custom endpoint
 client = OpenAI(
     base_url=API_BASE_URL,
-    api_key=API_KEY,
+    api_key="dummy-key", # Use a placeholder key
 )
 
 # --- Temperature Explanation ---
@@ -58,6 +67,9 @@ def generate_completion_with_temperature(prompt_content: str, temp_value: float)
     print("-" * 30)
 
     try:
+        # Fetch the latest API key and update the client
+        client.api_key = get_api_key() # Dynamically set API key
+
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
