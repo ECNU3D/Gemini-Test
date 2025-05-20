@@ -1,114 +1,67 @@
 """
-Example of enforcing structured output using forced tool calling with the
-OpenAI-compatible Chat Completions endpoint and the Python requests library.
-
-This example demonstrates how to enforce a complex class structure with various data types.
+Example of enforcing structured output using Pydantic models and the
+OpenAI-compatible Chat Completions endpoint with the 'requests' Python library,
+specifically for generating car descriptions.
 """
 
 import os
+import sys
 import json
-import requests
+from enum import Enum
 from dotenv import load_dotenv
+from pydantic import BaseModel
+import requests
+
+# Add the parent directory (openai_compatible_examples) to sys.path
+# to allow importing from the 'utils' module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+from utils.auth_helpers import get_api_key
 
 # --- Configuration ---
 load_dotenv()  # Load environment variables from .env file
 
 API_BASE_URL = os.getenv("OPENAI_API_BASE", "http://localhost:8000/v1")
 API_KEY = os.getenv("OPENAI_API_KEY", "dummy-key")
-MODEL_NAME = os.getenv("MODEL_NAME")  # Optional
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-3B-Instruct") # Default model if not set
 
-# --- Tool Definition (Complex Class Schema) ---
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "extract_person_details",
-            "description": "Extracts person details from the provided text.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Full name of the person"
-                    },
-                    "age": {
-                        "type": "integer",
-                        "description": "Age in years"
-                    },
-                    "height": {
-                        "type": "number",
-                        "description": "Height in meters"
-                    },
-                    "is_student": {
-                        "type": "boolean",
-                        "description": "Whether the person is a student"
-                    },
-                    "hobbies": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "List of hobbies"
-                    },
-                    "address": {
-                        "type": "object",
-                        "properties": {
-                            "street": {"type": "string"},
-                            "city": {"type": "string"},
-                            "zip_code": {"type": "string"}
-                        },
-                        "required": ["street", "city"]
-                    },
-                    "scores": {
-                        "type": "array",
-                        "items": {
-                            "type": "number"
-                        },
-                        "description": "List of test scores"
-                    },
-                    "metadata": {
-                        "type": "object",
-                        "description": "Additional metadata about the person"
-                    }
-                },
-                "required": ["name", "age", "is_student"]
-            }
-        }
-    }
-]
+# --- Pydantic Models ---
+class CarType(str, Enum):
+    sedan = "sedan"
+    suv = "SUV"
+    truck = "Truck"
+    coupe = "Coupe"
+
+class CarDescription(BaseModel):
+    brand: str
+    model: str
+    car_type: CarType
 
 def main():
     # --- API Request ---
-    input_text = """
-    John Smith is a 25-year-old student who lives at 123 Main Street, New York, NY 10001. 
-    He is 1.85 meters tall and enjoys playing basketball, reading, and coding. 
-    His recent test scores were 85.5, 92.0, and 88.5. 
-    He has been a student for 3 years and is currently pursuing a degree in Computer Science.
-    """
-    
+    json_schema = CarDescription.model_json_schema()
+
     messages = [
-        {"role": "system", "content": "You are an expert data extraction assistant."},
-        {"role": "user", "content": f"Extract person details from this text: {input_text}"}
+        {
+            "role": "user",
+            "content": "Generate a JSON with the brand, model and car_type of the most iconic car from the 90's",
+        }
     ]
 
-    # Force the model to use the specified tool
-    forced_tool_choice = {"type": "function", "function": {"name": "extract_person_details"}}
+    headers = {
+        "Authorization": f"Bearer {get_api_key()}",
+        "Content-Type": "application/json"
+    }
 
-    # Prepare the request payload
     payload = {
         "model": MODEL_NAME,
         "messages": messages,
-        "tools": tools,
-        "tool_choice": forced_tool_choice
-    }
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {API_KEY}"
+        "guided_json": json_schema
     }
 
     try:
-        # Make the API request
         response = requests.post(
             f"{API_BASE_URL}/chat/completions",
             headers=headers,
@@ -116,45 +69,31 @@ def main():
         )
         response.raise_for_status()  # Raise an exception for bad status codes
 
-        # Parse the response
-        result = response.json()
-        
-        # Extract the tool call from the response
-        message = result["choices"][0]["message"]
-        
-        if "tool_calls" in message:
-            tool_call = message["tool_calls"][0]
-            function_name = tool_call["function"]["name"]
-            function_args_str = tool_call["function"]["arguments"]
+        completion = response.json()
 
-            if function_name == "extract_person_details":
-                print("--- Successfully received structured output ---")
-                try:
-                    structured_output = json.loads(function_args_str)
-                    print(f"Extracted Data (JSON):\n{json.dumps(structured_output, indent=2)}")
-                    
-                    # Demonstrate accessing the structured data
-                    print("\nAccessing fields:")
-                    print(f"Name: {structured_output.get('name')}")
-                    print(f"Age: {structured_output.get('age')}")
-                    print(f"Height: {structured_output.get('height')}")
-                    print(f"Is Student: {structured_output.get('is_student')}")
-                    print(f"Hobbies: {', '.join(structured_output.get('hobbies', []))}")
-                    print(f"Address: {structured_output.get('address', {})}")
-                    print(f"Test Scores: {structured_output.get('scores', [])}")
-                except json.JSONDecodeError:
-                    print("Error: Could not decode tool arguments JSON.")
-                    print(f"Raw Arguments: {function_args_str}")
-            else:
-                print("Error: Response did not contain the expected tool call.")
+        # --- Response Handling ---
+        if completion.get("choices") and \
+           completion["choices"][0].get("message") and \
+           completion["choices"][0]["message"].get("content"):
+            print("--- Successfully received structured output ---")
+            print("Generated Car Description:")
+            # The content is a JSON string, so we parse it for pretty printing or further use
+            # For this example, we'll print it as is, assuming it's well-formed JSON.
+            print(completion["choices"][0]["message"]["content"])
         else:
-            print("Error: Model did not return a tool call as expected.")
+            print("Error: Model did not return the expected data.")
+            print(f"Raw response: {completion}")
 
     except requests.exceptions.RequestException as e:
-        print(f"An API error occurred: {e}")
+        print(f"An HTTP error occurred: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                print(f"Response content: {e.response.json()}")
+            except json.JSONDecodeError:
+                print(f"Response content: {e.response.text}")
         raise
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"An error occurred: {e}")
         raise
 
 if __name__ == "__main__":
