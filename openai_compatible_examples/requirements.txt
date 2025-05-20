@@ -5,6 +5,7 @@ python-dotenv
 tenacity
 langchain
 llama-index
+matplotlib
 
 # Potentially add more specific framework packages later, e.g.:
 langchain-openai
