@@ -44,7 +44,7 @@ base_input_sentences = [
     "Number nine, almost there.",
     "Finally, the tenth sentence for this batch."
 ]
-input_text = [sentence for _ in range(INPUT_TEXT_MULTIPLIER) for sentence in base_input_sentences]
+input_text = [sentence * INPUT_TEXT_MULTIPLIER for sentence in base_input_sentences]
 
 # input_text = "A single input string." # Kept for reference, but batch uses list
 

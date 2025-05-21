@@ -6,6 +6,8 @@ tenacity
 langchain
 llama-index
 matplotlib
+PyMuPDF
+reportlab
 
 # Potentially add more specific framework packages later, e.g.:
 langchain-openai
